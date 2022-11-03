@@ -295,9 +295,9 @@ var intro_text = [ //create introductory text
    "<img src= stimuli/1000000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Sam is only allowed to select one basket to search for the ball.</p>",
    "<img src= stimuli/1000000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Your job will be to predict which basket Sam will choose to search for the ball.</p>",
    "<img src= stimuli/1101000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Sometimes, Sam will be able to see the ball! These trials are easy for Sam.</p>",
-   "<img src= stimuli/1111000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Other times, Sam will not be able to see the ball.</p> <p> In some of these trials, Sam will need to guess.",
-    "<img src= stimuli/1111111.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>The ball will always be in one of the three baskets, even when it's hidden from view. </p>",
-   "<img src= stimuli/1111000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Regardless, you will need to predict which basket Sam will choose.</p>",
+   "<img src= stimuli/1111000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Other times, Sam will not be able to see the ball.</p> <p> In some of these trials, Sam will need to guess. </p>",
+    "<img src= stimuli/1111111.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Sometimes, the ball will be hidden entirely. <p> But even when the ball is hidden from view, it will always be in one of the three baskets. </p>",
+   "<img src= stimuli/1111000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p> You should always select the basket which you think Sam is most likely to choose, even when you can't be certain of the answer.</p>",
    "<img src= stimuli/keyboard_diagram.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>You will use your keyboard to respond.</p> <p> Throughout the experiment, please be ready to use your 'left arrow (◀️)', 'down arrow (🔽)', and 'right arrow (▶️)' keys to select the left, middle, or right basket.</p> <p> Your spacebar will be used to continue between trials. </p>",
    "<img src= stimuli/11010001.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Sam's responses have been prerecorded. After each trial, you will recieve feedback about whether your prediction was correct. A red rectangle will show you which basket Sam picked. </p>",
    "<p> For every trial you answer correctly, you will receive a 2/3 cent bonus payment. <p> This experiment consists of 144 trials, so the maximum bonus is $0.96. </p> <p> This experiment is designed to take approximately 6 minutes.",
@@ -558,6 +558,23 @@ timeline.push(instructions)
     timeline.push(feedback)
     }
 
+  //give accuracy/bonus feedback
+  var bonus_feedback = {
+    type: jsPsychHtmlButtonResponse,
+    choices: ['Continue'],
+    stimulus: function() {
+      var trials = jsPsych.data.get().filterCustom(function(trial){
+                return (trial.trial == 'prediction_trial');
+                })
+
+      var bonus = trials.select('accuracy_bool').mean() * max_bonus
+      var trials_correct = trials.select('accuracy_bool').sum()
+
+      return "You have answered " + String(trials_correct) + " out of 144 trials correctly. You will recieve a $" + bonus.toFixed(2) + " bonus payment through Prolific, following the successful submission of this experiment. This bonus payment may take multiple days to be processed."
+              }
+  }
+
+  timeline.push(bonus_feedback)
   //-------------------------------------------------------------
   //EXIT QUIZ
 //-------------------------------------------------------------
