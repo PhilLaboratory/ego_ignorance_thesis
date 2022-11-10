@@ -10,41 +10,172 @@ output: html_document
 library(dplyr)
 library(ggplot2)
 library(tidyr)
+library(broom.mixed)
+library(nnet)
+library(lme4)
 library(tidyverse)
 ```
 
-#Load and Wrangle Data
+#Load Data
 ```{r}
-sandbox_data <- read_csv("../../data/sandbox_trials.csv")
+df.ex1.trials <- read_csv("../../data/experiment_1/ego_ignorance_thesis-trials.csv")
+```
+
+#Wrangle Data
+```{r}
+#quick function to count occluders in a string
+n_occluders <- Vectorize(function(x) {
+  return(sum(as.numeric(strsplit(x, '')[[1]])))
+})
 
 #add some info
-sandbox_data <- sandbox_data %>% 
+df.ex1.trials <- df.ex1.trials %>% 
+  filter(workerid != 32) %>% #worker 32 timed out on prolific. Their submission is excluded
   mutate(
     response_alter_occluded = case_when(
-      substring(alter_occluders, response+1, response+1) == '0' ~ TRUE,
+      substring(alter_occluders, response+1, response+1) == '1' ~ TRUE,
       TRUE ~ FALSE
     ),
     response_ego_occluded = case_when(
-      substring(ego_occluders, response+1, response+1) == '0' ~ TRUE,
+      substring(ego_occluders, response+1, response+1) == '1' ~ TRUE,
       TRUE ~ FALSE
-    )
+    ),
+    num_ego_occluders = n_occluders(ego_occluders),
+    num_alter_occluders = n_occluders(alter_occluders),
+    response_ball_position = (response==ball_pos)
+  ) 
+```
+#Calculate Pilot Bonus info
+```{r}
+df.ex1_pilot.rewards <- read_csv("../../data/experiment_1/pilot/ego_ignorance_thesis-participants.csv")
+df.ex1_pilot.prolific_ids <- read_csv("../../data/experiment_1/pilot/ego_ignorance_thesis-workerids.csv")
+
+# for 5 pilot subjects (workerids = 12, 13, 14, 15, 16)
+#merge bonuses with prolific ids
+df.ex1_pilot.rewards = df.ex1_pilot.rewards %>% 
+  select(workerid, bonus) %>% 
+  inner_join(df.ex1.prolific_ids) %>% 
+  select(-workerid) %>% 
+  relocate(prolific_participant_id) %>% 
+  mutate(
+    bonus = round(bonus, 2)
   )
+
+#bonuses file, ready to paste into Prolific
+write.table(df.ex1_pilot.rewards, "../../data/experiment_1/pilot/experiment_1-bonuses-pilot.txt", sep = ",", col.names = FALSE, row.names = FALSE, quote=FALSE)
+```
+
+
+#Calculate Ex1 Bonus info
+```{r}
+df.ex1.participants <- read_csv("../../data/experiment_1/ego_ignorance_thesis-participants.csv")
+df.ex1.prolific_ids <- read_csv("../../data/experiment_1/ego_ignorance_thesis-workerids.csv")
+df.ex1.prolific_demos <- read_csv("../../data/experiment_1/prolific_demos.csv") #demographics downloaded from prolific
+
+#merge bonuses with prolific ids
+df.ex1.rewards = df.ex1.participants %>% 
+  filter(proliferate.condition=='Experiment 1') %>% 
+  select(workerid, bonus) %>% 
+  inner_join(df.ex1.prolific_ids) %>% 
+  select(-workerid) %>% 
+  relocate(prolific_participant_id) %>% 
+  mutate(
+    bonus = round(bonus, 2)
+  ) %>% 
+  filter(prolific_participant_id %in% df.ex1.prolific_demos$`Participant id`) #one participant timed out. Remove them be ensuring all participants are in the approved list from prolific demos
+
+#bonuses file, ready to paste into Prolific
+write.table(df.ex1.rewards, "../../data/experiment_1/experiment_1-bonuses.txt", sep = ",", col.names = FALSE, row.names = FALSE, quote=FALSE)
+```
+
+
+
+#Figures
+
+##Make right choice when there is one?
+```{r}
+
+#overall
+alter_ig_data <- df.ex1.trials %>%
+  count(collective_can_infer, accuracy) %>% 
+  rename(responses = n)
+
+fig1 <- ggplot(
+  data = alter_ig_data,
+  mapping = aes(
+    x = collective_can_infer,
+    y = responses,
+    fill = accuracy)
+  ) +
+  geom_col(
+    position = 'dodge'
+  )
+
+
+fig1
 
 ```
 
-#Figures
+##Preference to select ball
+```{r}
+
+#overall
+alter_ig_data <- df.ex1.trials %>% 
+  count(ego_can_infer, response_ball_position) %>% 
+  rename(responses = n)
+
+fig1 <- ggplot(
+  data = alter_ig_data,
+  mapping = aes(
+    x = ego_can_infer,
+    y = responses,
+    fill = response_ball_position)
+  ) +
+  geom_col(
+    position = 'dodge'
+  )
+
+
+fig1
+
+#for logical guesses, within conditions where ego_can_infer
+alter_ig_data <- df.ex1.trials %>% 
+  filter(ego_can_infer) %>% 
+  count(alter_can_infer, response_ball_position) %>% 
+  rename(responses = n)
+
+fig2 <- ggplot(
+  data = alter_ig_data,
+  mapping = aes(
+    x = alter_can_infer,
+    y = responses,
+    fill = response_ball_position)
+  ) +
+  geom_col(
+    position = 'dodge'
+  )
+
+
+fig2
+```
 
 ##Proposed analysis from thesis
 ```{r}
 #take cases when ego can see at least one position, and alter can see nothing
-alter_ig_data <- sandbox_data %>% 
+alter_ig_data <- df.ex1.trials %>% 
   filter(
-    ego_occluders == '011' | ego_occluders != '110' | ego_occluders != '101',
+    ego_occluders == '011' | ego_occluders == '110' | ego_occluders == '101',
     alter_occluders == '111'
   ) %>% 
   group_by(ego_ball_visible) %>% 
   count(response_ego_occluded) %>% 
-  rename(responses = n)
+  rename(responses = n) %>% 
+  mutate(
+    responses = case_when(
+      response_ego_occluded ~ responses * 0.5,
+      !(response_ego_occluded) ~ responses * 1,
+    )
+  )
 
 fig1 <- ggplot(
   data = alter_ig_data,
@@ -57,10 +188,69 @@ fig1 <- ggplot(
     position = 'dodge'
   )
 
+
 fig1
 ```
 
+##Interest in alter knowlege?
+```{r}
+#take cases when participant can't see ball and can or can't infer it's position. Is participant more likely to select a position if the character can see it? 
+#Is this only the case when the participant can't infer the ball's location?
+#correct for baseline proportion of cases which are alter_occluded
+alter_ig_data <- df.ex1.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  group_by(ego_can_infer, response_alter_occluded) %>% 
+  summarize(
+    responses = n(),
+    total_alt_occluded = sum(num_alter_occluders)
+  )
 
+corrected_alter_ig_data <- alter_ig_data %>% 
+  group_by(ego_can_infer) %>% 
+  summarize(
+    proportion_alt_occluded = sum(total_alt_occluded) / (3*sum(responses)),
+    proportion_not_occluded = 1 - proportion_alt_occluded
+  ) %>% 
+  inner_join(alter_ig_data) %>% 
+  mutate(
+    corrected_responses = case_when(
+      response_alter_occluded ~ responses / proportion_alt_occluded,
+      response_alter_occluded == FALSE ~ responses / proportion_not_occluded
+    )
+  )
+
+fig1 <- ggplot(
+  data = corrected_alter_ig_data,
+  mapping = aes(
+    x = ego_can_infer,
+    y = corrected_responses,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position = 'dodge'
+  )
+
+fig1
+
+#
+```
+
+# Analyses
+
+## Interest in alter knowledge
+```{r}
+df.mult.0 <- df.ex1.trials 
+
+#is the participant more likely to select a position that is alter occluded when they know where the ball is? aka 
+#are they more likely to select an !alter_occluded position when they don't know where the ball is 
+mult.0 = multinom(
+  response_alter_occluded ~ ego_can_infer + num_alter_occluders,
+  data = df.mult.0)
+
+tidy(mult.0)
+```
 
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
