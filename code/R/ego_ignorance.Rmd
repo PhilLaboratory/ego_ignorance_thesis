@@ -10,9 +10,12 @@ output: html_document
 library(dplyr)
 library(ggplot2)
 library(tidyr)
+library(AICcmodavg)
 library(broom.mixed)
 library(nnet)
 library(lme4)
+library(effectsize)
+library(pwr)
 library(tidyverse)
 ```
 
@@ -159,7 +162,7 @@ fig2 <- ggplot(
 fig2
 ```
 
-##Proposed analysis from thesis
+##Proposed analysis from thesis: Total Responses
 ```{r}
 #take cases when ego can see at least one position, and alter can see nothing
 alter_ig_data <- df.ex1.trials %>% 
@@ -191,8 +194,142 @@ fig1 <- ggplot(
 
 fig1
 ```
+```{r}
+#take cases when ego can see at least one position, and alter can see nothing
+alter_ig_data <- df.ex1.trials %>% 
+  filter(
+    ego_occluders == '011' | ego_occluders == '110' | ego_occluders == '101',
+    alter_occluders == '111'
+  ) %>% 
+  group_by(ego_ball_visible, workerid) %>% 
+  count(response_ego_occluded) %>% 
+  rename(responses = n) %>% 
+  mutate(
+    responses = case_when(
+      response_ego_occluded ~ responses * 0.5,
+      !(response_ego_occluded) ~ responses * 1,
+    )
+  )
 
-##Interest in alter knowlege?
+alter_ig_proportions <- alter_ig_data %>% 
+  group_by(ego_ball_visible, workerid) %>% 
+  summarize(total_responses = sum(responses)) %>% 
+  inner_join(alter_ig_data, by = c('workerid', 'ego_ball_visible')) %>% 
+  filter(response_ego_occluded) %>% 
+  mutate(
+    proportion_responses_ego_occluded_corrected = responses / total_responses
+  )
+
+fig1 <- ggplot(
+  data = alter_ig_proportions ,
+  mapping = aes(
+    x = ego_ball_visible,
+    y = proportion_responses_ego_occluded_corrected)
+  ) +
+  geom_boxplot(
+    position = 'dodge'
+  ) +
+  geom_point(
+    position = 'jitter'
+  )
+
+
+fig1
+```
+
+##Proposed analysis from thesis: Responses by participant level probability
+```{r}
+alter_ig_data <- df.ex1.trials %>% 
+  filter(#take cases when ego can see exactly one position and alter can see nothing
+    ego_occluders == '011' | ego_occluders == '110' | ego_occluders == '101',
+    alter_occluders == '111'
+  ) %>% 
+  group_by(ego_ball_visible, response_ego_occluded, workerid) %>% 
+  summarise( #count the total number of times each participant selects the ego_occluded position, and the number of ego_occluded positions available in each condition
+    responses = n(),
+    total_ego_occluders = sum(num_ego_occluders)
+    ) 
+
+alter_ig_data_proportional <- alter_ig_data %>% 
+  group_by(ego_ball_visible, workerid) %>% 
+  summarise( #count the total number of ego occluders available by ego_ball_visible
+    total_condition_ego_occluders = sum(total_ego_occluders)) %>% 
+  inner_join(alter_ig_data, by = c('ego_ball_visible', 'workerid')) %>% 
+  filter(response_ego_occluded) %>% 
+  mutate(#calculate the probability of selecting an ego_occluded position (number of ego_occ positions selected divided by number of ego_occluded positions available in each condition)
+    probability_response_ego_occluded = responses / total_condition_ego_occluders,
+    probability_response_possible_location = case_when(
+      ego_ball_visible ~ 1 - probability_response_ego_occluded,
+      !(ego_ball_visible) ~ probability_response_ego_occluded
+    )
+  )
+  
+fig1 <- ggplot(
+  data = alter_ig_data_proportional,
+  mapping = aes(
+    x = ego_ball_visible,
+    y = probability_response_ego_occluded)
+  ) +
+  geom_boxplot(
+    position = 'dodge'
+  ) +
+  geom_point(position = 'jitter')
+
+
+fig1
+
+fig2 <- ggplot(
+  data = alter_ig_data_proportional,
+  mapping = aes(
+    x = ego_ball_visible,
+    y = probability_response_possible_location)
+  ) +
+  geom_boxplot(
+    position = 'dodge'
+  ) +
+  geom_point(position = 'jitter')
+
+
+fig2
+  
+
+```
+##Proposed analysis from thesis: RT
+- Shows that when the ball is hidden, there's no effect
+- When the ball is visible, it's more effortless to select the open position
+```{r}
+#take cases when ego can see at least one position, and alter can see nothing
+alter_ig_data <- df.ex1.trials %>% 
+  filter(
+    ego_occluders == '011' | ego_occluders == '110' | ego_occluders == '101',
+    alter_occluders == '111'
+  ) %>% 
+  group_by(workerid) %>% 
+  filter(rt >= (mean(rt)-2.5*sd(rt)) & rt <= (mean(rt)+2.5*sd(rt))) %>% #filter to 2.5 sd for each participant
+  group_by(ego_ball_visible, response_ego_occluded, workerid) %>% 
+  summarize(rt = mean(rt))
+
+fig1 <- ggplot(
+  data = alter_ig_data,
+  mapping = aes(
+    x = ego_ball_visible,
+    y = rt,
+    fill = response_ego_occluded)
+  ) +
+  geom_boxplot(
+    position = 'dodge'
+  ) +
+  geom_point(position='jitter') +
+  ylim(0, 6000)
+
+
+fig1
+
+aov <- aov(rt ~ ego_ball_visible*response_ego_occluded, data=alter_ig_data)
+summary(aov)
+```
+
+##Interest in alter knowlege? Total responses with sketchy correction
 ```{r}
 #take cases when participant can't see ball and can or can't infer it's position. Is participant more likely to select a position if the character can see it? 
 #Is this only the case when the participant can't infer the ball's location?
@@ -234,23 +371,160 @@ fig1 <- ggplot(
 
 fig1
 
-#
+```
+##Interest in alter knowlege? Responses by participant level probabilities (still sketchy)
+
+```{r}
+alter_ig_data <- df.ex1.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  group_by(ego_can_infer, response_alter_occluded, workerid) %>% 
+  summarize(
+    responses = n(),
+    total_alt_occluded = sum(num_alter_occluders)
+  )
+
+corrected_alter_ig_data <- alter_ig_data %>% 
+  group_by(ego_can_infer, workerid) %>% 
+  summarize(
+    total_condition_alt_occluded = sum(total_alt_occluded)) %>% 
+  inner_join(alter_ig_data, by = c('ego_can_infer', 'workerid')) %>% 
+  filter(response_alter_occluded) %>% 
+  mutate(
+    probability_response_alter_occluded = responses / total_condition_alt_occluded
+  )
+
+
+fig1 <- ggplot(
+  data = corrected_alter_ig_data,
+  mapping = aes(
+    x = ego_can_infer,
+    y = probability_response_alter_occluded)
+  ) +
+  geom_boxplot(
+    position = 'dodge'
+  ) +
+  geom_point( position = 'jitter')
+
+fig1
+
+#supporting analysis--participants are more likely to select an alter_occluded position if they can infer where the ball is
+aov.1 <- aov(probability_response_alter_occluded ~ ego_can_infer + workerid, data = corrected_alter_ig_data)
+summary(aov.1)
+```
+
+
+##Interest in alter knowlege? RT
+```{r}
+#take cases when participant can't see ball and can or can't infer it's position. Is participant more likely to select a position if the character can see it? 
+#Is this only the case when the participant can't infer the ball's location?
+#correct for baseline proportion of cases which are alter_occluded
+alter_ig_data <- df.ex1.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  group_by(ego_can_infer, response_alter_occluded, workerid) %>% 
+  summarize(
+    rt = mean(rt)
+  )
+
+fig1 <- ggplot(
+  data = alter_ig_data,
+  mapping = aes(
+    x = ego_can_infer,
+    y = rt,
+    fill = response_alter_occluded)
+  ) +
+  geom_boxplot(
+    position = 'dodge'
+  ) + 
+  geom_point(
+    position = 'jitter'
+  )
+
+fig1
+
+#supporting analysis--no significant overall effects or interaction
+aov <- aov(rt ~ ego_can_infer*response_alter_occluded, data = alter_ig_data)
+summary(aov)
 ```
 
 # Analyses
 
+## Proposed Analyses
+```{r}
+#RT
+alter_ig_data <- df.ex1.trials %>% 
+  filter(
+    ego_occluders == '011' | ego_occluders == '110' | ego_occluders == '101',
+    alter_occluders == '111'
+  ) %>% 
+  group_by(ego_ball_visible, response_ego_occluded, workerid) %>% 
+  summarize(rt = mean(rt))
+
+av.0 <- aov(rt ~ ego_ball_visible * response_ego_occluded, data = alter_ig_data)
+summary(av.0)
+```
+
 ## Interest in alter knowledge
 ```{r}
-df.mult.0 <- df.ex1.trials 
+
+#Responses
+df.glm.0 <- df.ex1.trials 
 
 #is the participant more likely to select a position that is alter occluded when they know where the ball is? aka 
 #are they more likely to select an !alter_occluded position when they don't know where the ball is 
-mult.0 = multinom(
+glm.0 = glm(
   response_alter_occluded ~ ego_can_infer + num_alter_occluders,
   data = df.mult.0)
 
-tidy(mult.0)
+
+#using participant level probabilities of selecting an alter occluded position
+alter_ig_data <- df.ex1.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  group_by(ego_can_infer, response_alter_occluded, workerid) %>% 
+  summarize(
+    responses = n(),
+    total_alt_occluded = sum(num_alter_occluders)
+  )
+
+
+corrected_alter_ig_data <- alter_ig_data %>% 
+  group_by(ego_can_infer, workerid) %>% 
+  summarize(
+    total_condition_alt_occluded = sum(total_alt_occluded)) %>% 
+  inner_join(alter_ig_data, by = c('ego_can_infer', 'workerid')) %>% 
+  filter(response_alter_occluded) %>% 
+  mutate(
+    probability_response_alter_occluded = responses / total_condition_alt_occluded
+  )
+
+#Are participants more likely to select alter occluded positions when they know where the ball is? (and therefore more likely to select alter-visible positions when they don't know where the ball is)
+#performed on participant x condition 'probability score' (total number of occluded or non-occluded positions corrected for the baseline freuency of occluded or non-occluded positions)
+aov.1 <- aov(probability_response_alter_occluded ~ ego_can_infer + workerid, data = corrected_alter_ig_data)
+summary(aov.1)
+
 ```
+###Post-hoc power analysis
+```{r}
+
+#eta-squaredfr ego_can_infer = 0.07 
+eta_squared(aov.1)
+
+#cohens-f = 0.27 for affect of ego_can_infer
+cohens_f(aov.1)
+
+#power analysis based upon f=0.27, power=0.8, 
+pwr.anova.test(k=2,            # 2 groups are compared
+               f=.27,          # effect size due to ego_can_infer
+               sig.level=.05,  # alpha/sig. level = .05
+               power=.8)       # confint./power = .8
+#shows n=55
+```
+
 
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
