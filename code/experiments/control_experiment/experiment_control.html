@@ -190,6 +190,7 @@ for(var i = 0; i < stimuli_names.length; i++){
 //define trial sequence
 trials = []
 
+
 //add representative set of trials
 for(var i=0; i<trial_count; i++){
   var name = stimuli_names[i]
@@ -208,6 +209,29 @@ var practice_trials = jsPsych.randomization.shuffle(stimuli_names).slice(0,pract
     const window_width = window.innerWidth
     var timeline = []
 
+//preload all image stimuli
+var all_images = []
+for(var i=0; i<stimuli_names.length; i++){
+  const name = ('stimuli/' + stimuli_names[i])
+  all_images.push(name + '.jpg') //filepath for base stimulus
+  all_images.push(name + '0.jpg') //filepath for each each possible feedblack image
+  all_images.push(name + '1.jpg') 
+  all_images.push(name + '2.jpg') 
+}
+
+var preload = {
+  type: jsPsychPreload,
+  images: all_images
+}
+
+timeline.push(preload)
+
+//force fullscreen
+var fullscreen = {
+  type: jsPsychFullscreen
+}
+
+timeline.push(fullscreen)
 
 //------------------------------------------------------------------------------------------------------------------------------------------------
 //Instructions
