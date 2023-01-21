@@ -63,7 +63,7 @@ var jsPsych = initJsPsych({
 var trial_count = 144
 var practice_length = 10
 var stimulus_width = 0.7 //ratio of window width
-var max_bonus = 1.44
+var max_bonus = 0.96
 
 //------------------------------------------------------------------------------------------------------------------------------------------------
 //setup stimuli info and choose trials
@@ -112,7 +112,7 @@ for(var i = 0; i < stimuli_names.length; i++){
   } else if((parseInt(name[4]) + parseInt(name[5]) + parseInt(name[6])) == 1){
     var ego_can_infer = true
   } else {
-    var ego_can_infer = true
+    var ego_can_infer = false
   }
 
   //can the character see the ball? (whether or not the subject knows it?)
@@ -170,8 +170,7 @@ for(var i = 0; i < stimuli_names.length; i++){
   }
   search_locations = jsPsych.randomization.shuffle(search_locations) //shuffle options, the answer will be defined as the first in the list
 
-
-
+//add all the info to the big 'ol dictionary'
   stimuli[name] = {
     filepath: 'stimuli/' + name + '.jpg',
     ball_pos: ball_pos,
@@ -188,38 +187,59 @@ for(var i = 0; i < stimuli_names.length; i++){
 }
 
 //define trial sequence
-key_trials = []
-other_trials = []
+  key_trials = []
+  other_trials = []
 
-//add key trials three times each
-for(var i=0; i<stimuli_names.length; i++){
-  var name = stimuli_names[i]
-  if(parseInt(name[1]) + parseInt(name[2]) + parseInt(name[3]) == 3){
-  key_trials.push(name)
-  key_trials.push(name)
-  key_trials.push(name)
-  } else {
-  other_trials.push(name)
+  //add key trials three times each
+  for(var i=0; i<stimuli_names.length; i++){
+    var name = stimuli_names[i]
+    if(parseInt(name[1]) + parseInt(name[2]) + parseInt(name[3]) == 3){
+    key_trials.push(name)
+    key_trials.push(name)
+    key_trials.push(name)
+    } else {
+    other_trials.push(name)
+    }
   }
-}
-//add an equal number of filler trials
-other_trials = jsPsych.randomization.shuffle(other_trials).slice(0,key_trials.length)
+  //add an equal number of filler trials
+  other_trials = jsPsych.randomization.shuffle(other_trials).slice(0,key_trials.length)
 
 
-var trials = key_trials.concat(other_trials)
-trials = jsPsych.randomization.shuffleNoRepeats(trials)
-console.log(trials.length)
+  var trials = key_trials.concat(other_trials)
+  trials = jsPsych.randomization.shuffleNoRepeats(trials)
 
-var practice_trials = jsPsych.randomization.shuffle(stimuli_names).slice(0,practice_length)
+  var practice_trials = jsPsych.randomization.shuffle(stimuli_names).slice(0,practice_length)
 
 //------------------------------------------------------------------------------------------------------------------------------------------------
 //start timeline
 //------------------------------------------------------------------------------------------------------------------------------------------------
 
-    const window_width = window.innerWidth
-    var timeline = []
+const window_width = window.screen.availWidth //get fullscreen width available for fulscreen
 
+var timeline = []
 
+//preload all image stimuli
+var all_images = []
+for(var i=0; i<stimuli_names.length; i++){
+  const name = ('stimuli/' + stimuli_names[i])
+  all_images.push(name + '.jpg') //filepath for base stimulus
+  all_images.push(name + '0.jpg') //filepath for each each possible feedblack image
+  all_images.push(name + '1.jpg') 
+  all_images.push(name + '2.jpg') 
+}
+
+var preload = {
+  type: jsPsychPreload,
+  images: all_images
+}
+
+timeline.push(preload)
+
+var fullscreen = {
+  type: jsPsychFullscreen
+}
+
+timeline.push(fullscreen)
 
 //------------------------------------------------------------------------------------------------------------------------------------------------
 //Instructions
@@ -275,12 +295,12 @@ var intro_text = [ //create introductory text
    "<img src= stimuli/1000000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Sam is only allowed to select one basket to search for the ball.</p>",
    "<img src= stimuli/1000000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Your job will be to predict which basket Sam will choose to search for the ball.</p>",
    "<img src= stimuli/1101000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Sometimes, Sam will be able to see the ball! These trials are easy for Sam.</p>",
-   "<img src= stimuli/1111000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Other times, Sam will not be able to see the ball.</p> <p> In some of these trials, Sam will need to guess.",
-    "<img src= stimuli/1111111.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>The ball will always be in one of the three baskets, even when it's hidden from view. </p>",
-   "<img src= stimuli/1111000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Regardless, you will need to predict which basket Sam will choose.</p>",
-   "<img src= stimuli/keyboard_diagram.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>You will use your keyboard to respond.</p> <p> Throughout the experiment, please be ready to use your 'left arrow (<)', 'down arrow (v)', and 'right arrow (>)' keys to select the left, middle, or right basket.</p> <p> Your spacebar will be used to continue between trials. </p>",
+   "<img src= stimuli/1111000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Other times, Sam will not be able to see the ball.</p> <p> In some of these trials, Sam will need to guess. </p>",
+    "<img src= stimuli/1111111.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Sometimes, the ball will be hidden entirely. <p> But even when the ball is hidden from view, it will always be in one of the three baskets. </p>",
+   "<img src= stimuli/1111000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p> You should always select the basket which you think Sam is most likely to choose, even when you can't be certain of the answer.</p>",
+   "<img src= stimuli/keyboard_diagram.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>You will use your keyboard to respond.</p> <p> Throughout the experiment, please be ready to use your 'left arrow (◀️)', 'down arrow (🔽)', and 'right arrow (▶️)' keys to select the left, middle, or right basket.</p> <p> Your spacebar will be used to continue between trials. </p>",
    "<img src= stimuli/11010001.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Sam's responses have been prerecorded. After each trial, you will recieve feedback about whether your prediction was correct. A red rectangle will show you which basket Sam picked. </p>",
-   "<p> For each trial you answer correctly, you will receive a 1 cent bonus payment. <p> This experiment consists of 144 trials, so the maximum bonus is $1.44 .",
+   "<p> For every trial you answer correctly, you will receive a 2/3 cent bonus payment. <p> This experiment consists of 144 trials, so the maximum bonus is $0.96. </p> <p> This experiment is designed to take approximately 6 minutes.",
    "Before we begin, let's practice!"]
 
 
@@ -299,7 +319,6 @@ intro.push(experiment_intro)
 //------------------------------------------------------------------------------------------------------------------------------------------------
 
 for(var i = 0; i < practice_trials.length; i++){
-
 var stimulus = practice_trials[i]
 var character_choice = jsPsych.randomization.shuffle(stimuli[stimulus]['search_locations'])[0]
 
@@ -359,68 +378,67 @@ intro.push(practice_feedback)
 
 var comprehension_instructions = {
   type: jsPsychHtmlButtonResponse,
-  stimulus: "Now that you've had some practice, you'll be tested with a couple of easy trials. If you correctly predict Sam's choice, you'll move on to complete the experiment!",
+  stimulus: "Now that you've had some practice, you'll be tested with a few easy trials. If you correctly predict Sam's choice, you'll move on to complete the experiment!",
   choices: ["Continue"]
 }
 intro.push(comprehension_instructions)
 
-
  //add a comprehension check
- var comprehension_quiz = {
-  type: jsPsychImageKeyboardResponse,
-  timeline: [
-    {
-      prompt: "<p> Where will Sam search for the ball?",
-      choices: ["arrowleft", "arrowdown", "arrowright"],
-      stimulus: "stimuli/0000011.jpg",
-      stimulus_width: window_width*stimulus_width,
-      data: {correct_response: 'arrowleft'},
-    },
-    {
-      prompt: function(){
-              if(jsPsych.data.getLastTrialData().values()[0].accuracy) {
-                return "<p> ✅ Correct! ✅</p> (press 'space' to continue)"
-              } else {
-                return "<p> ❌ Incorrect! ❌</p> (press 'space' to continue)"
-              }
-            },
-      stimulus: "stimuli/00000110.jpg",
-      stimulus_width: window_width*stimulus_width,
-      choices: [" "],
-      data: {correct_response: ' '}
-    },    
-    {
-      prompt: "<p> Where will Sam search for the ball?",
-      choices: ["arrowleft", "arrowdown", "arrowright"],
-      stimulus: "stimuli/1010010.jpg",
-      stimulus_width: window_width*stimulus_width,
-      data: {correct_response: 'arrowdown'}
-    },
-    {
-      prompt: function(){
-              if(jsPsych.data.getLastTrialData().values()[0].accuracy) {
-                return "<p> ✅ Correct! ✅</p> (press 'space' to continue)"
-              } else {
-                return "<p> ❌ Incorrect! ❌</p> (press 'space' to continue)"
-              }
-            },
-      stimulus: "stimuli/10100101.jpg",
-      stimulus_width: window_width*stimulus_width,
-      choices: [" "],
-      data: {correct_response: ' '}
-    }],
-  data: {
-      trial: 'comprehension_quiz'
-    },
-  on_finish: function(data){
-      var accuracy = false
-      if(data.correct_response == data.response){
-        accuracy = true
-      }
-      data.accuracy = accuracy
-    }
+var comprehension_trials = ['2000000', '0011011', '1010010', '1101101', '2010001']
+
+ for(var i = 0; i < comprehension_trials.length; i++){
+        var stimulus = comprehension_trials[i]
+        var character_choice = jsPsych.randomization.shuffle(stimuli[stimulus]['search_locations'])[0]
+
+        var comprehension_quiz = {
+        type: jsPsychImageKeyboardResponse,
+        prompt: "<p> Where will Sam search for the ball? </p?",
+        stimulus: stimuli[stimulus]['filepath'],
+        choices: ["arrowleft", "arrowdown", "arrowright"],
+        stimulus_width: window_width*stimulus_width,
+        data: {
+          trial: "comprehension_quiz",
+          character_choice: character_choice
+        },
+        on_finish: function(data){
+          if(data.response == "arrowleft") {
+            data.response = 0
+          } else if(data.response == "arrowdown") {
+            data.response = 1
+          } else if(data.response == "arrowright") {
+            data.response = 2
+          }
+
+          if(data.response == data.character_choice){
+            data.accuracy = true
+            data.accuracy_bool = 1
+          } else {
+            data.accuracy = false
+            data.accuracy_bool = 0
+          }
+        }
+        }
+
+        var comprehension_feedback = {
+        type: jsPsychImageKeyboardResponse,
+        prompt: function(){
+          if(jsPsych.data.getLastTrialData().values()[0].accuracy){
+            return "<p> ✅ Correct! ✅</p> (press 'space' to continue)"
+          } else {
+            return "<p> ❌ Incorrect! ❌</p> (press 'space' to continue)"
+          }
+        },
+        stimulus: "stimuli/" + stimulus + String(character_choice) + ".jpg",
+        choices: [" "],
+        stimulus_width: window_width*stimulus_width,
+        data: {
+          trial: "comprehension_feedback",
+          character_choice: stimuli[stimulus]['search_locations'][0]
+        }
+        }
+        intro.push(comprehension_quiz)
+        intro.push(comprehension_feedback)
 }
-intro.push(comprehension_quiz)
 
 //if one or more questions are answered incorrectly, play this message
  var fail_message = {
@@ -440,7 +458,7 @@ intro.push(comprehension_quiz)
     conditional_function: function(){
         // get the data from the previous trials,
         // if any were incorrect, display fail message and set data.loop = true
-        var data = jsPsych.data.get().last(4).values();
+        var data = jsPsych.data.get().last(comprehension_trials.length*2).values();
         if(data[0].accuracy && data[2].accuracy){
             return false;
         } else {
@@ -540,6 +558,23 @@ timeline.push(instructions)
     timeline.push(feedback)
     }
 
+  //give accuracy/bonus feedback
+  var bonus_feedback = {
+    type: jsPsychHtmlButtonResponse,
+    choices: ['Continue'],
+    stimulus: function() {
+      var trials = jsPsych.data.get().filterCustom(function(trial){
+                return (trial.trial == 'prediction_trial');
+                })
+
+      var bonus = trials.select('accuracy_bool').mean() * max_bonus
+      var trials_correct = trials.select('accuracy_bool').sum()
+
+      return "You have answered " + String(trials_correct) + " out of 144 trials correctly. You will recieve a $" + bonus.toFixed(2) + " bonus payment through Prolific, following the successful submission of this experiment. This bonus payment may take multiple days to be processed."
+              }
+  }
+
+  timeline.push(bonus_feedback)
   //-------------------------------------------------------------
   //EXIT QUIZ
 //-------------------------------------------------------------

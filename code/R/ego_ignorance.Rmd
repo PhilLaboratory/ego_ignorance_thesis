@@ -18,13 +18,14 @@ library(effectsize)
 library(pwr)
 library(tidyverse)
 ```
+#EXPERIMENT 1
 
-#Load Data
+##Load Data
 ```{r}
 df.ex1.trials <- read_csv("../../data/experiment_1/ego_ignorance_thesis-trials.csv")
 ```
 
-#Wrangle Data
+##Wrangle Data
 ```{r}
 #quick function to count occluders in a string
 n_occluders <- Vectorize(function(x) {
@@ -48,7 +49,8 @@ df.ex1.trials <- df.ex1.trials %>%
     response_ball_position = (response==ball_pos)
   ) 
 ```
-#Calculate Pilot Bonus info
+
+##Calculate Pilot Bonus info
 ```{r}
 df.ex1_pilot.rewards <- read_csv("../../data/experiment_1/pilot/ego_ignorance_thesis-participants.csv")
 df.ex1_pilot.prolific_ids <- read_csv("../../data/experiment_1/pilot/ego_ignorance_thesis-workerids.csv")
@@ -69,7 +71,8 @@ write.table(df.ex1_pilot.rewards, "../../data/experiment_1/pilot/experiment_1-bo
 ```
 
 
-#Calculate Ex1 Bonus info
+
+##Calculate Ex1 Bonus info
 ```{r}
 df.ex1.participants <- read_csv("../../data/experiment_1/ego_ignorance_thesis-participants.csv")
 df.ex1.prolific_ids <- read_csv("../../data/experiment_1/ego_ignorance_thesis-workerids.csv")
@@ -91,11 +94,9 @@ df.ex1.rewards = df.ex1.participants %>%
 write.table(df.ex1.rewards, "../../data/experiment_1/experiment_1-bonuses.txt", sep = ",", col.names = FALSE, row.names = FALSE, quote=FALSE)
 ```
 
+##Figures
 
-
-#Figures
-
-##Make right choice when there is one?
+###Make right choice when there is one?
 ```{r}
 
 #overall
@@ -119,7 +120,7 @@ fig1
 
 ```
 
-##Preference to select ball
+###Preference to select ball
 ```{r}
 
 #overall
@@ -162,7 +163,7 @@ fig2 <- ggplot(
 fig2
 ```
 
-##Proposed analysis from thesis: Total Responses
+###Proposed analysis from thesis: Total Responses
 ```{r}
 #take cases when ego can see at least one position, and alter can see nothing
 alter_ig_data <- df.ex1.trials %>% 
@@ -194,6 +195,7 @@ fig1 <- ggplot(
 
 fig1
 ```
+
 ```{r}
 #take cases when ego can see at least one position, and alter can see nothing
 alter_ig_data <- df.ex1.trials %>% 
@@ -237,7 +239,7 @@ fig1 <- ggplot(
 fig1
 ```
 
-##Proposed analysis from thesis: Responses by participant level probability
+###Proposed analysis from thesis: Responses by participant level probability
 ```{r}
 alter_ig_data <- df.ex1.trials %>% 
   filter(#take cases when ego can see exactly one position and alter can see nothing
@@ -294,7 +296,8 @@ fig2
   
 
 ```
-##Proposed analysis from thesis: RT
+
+###Proposed analysis from thesis: RT
 - Shows that when the ball is hidden, there's no effect
 - When the ball is visible, it's more effortless to select the open position
 ```{r}
@@ -329,7 +332,7 @@ aov <- aov(rt ~ ego_ball_visible*response_ego_occluded, data=alter_ig_data)
 summary(aov)
 ```
 
-##Interest in alter knowlege? Total responses with sketchy correction
+###Interest in alter knowlege? Total responses with sketchy correction
 ```{r}
 #take cases when participant can't see ball and can or can't infer it's position. Is participant more likely to select a position if the character can see it? 
 #Is this only the case when the participant can't infer the ball's location?
@@ -372,7 +375,8 @@ fig1 <- ggplot(
 fig1
 
 ```
-##Interest in alter knowlege? Responses by participant level probabilities (still sketchy)
+
+###Interest in alter knowlege? Responses by participant level probabilities (still sketchy)
 
 ```{r}
 alter_ig_data <- df.ex1.trials %>% 
@@ -380,14 +384,14 @@ alter_ig_data <- df.ex1.trials %>%
     !ego_ball_visible
   ) %>% 
   group_by(ego_can_infer, response_alter_occluded, workerid) %>% 
-  summarize(
+  dplyr::summarize(
     responses = n(),
     total_alt_occluded = sum(num_alter_occluders)
   )
 
 corrected_alter_ig_data <- alter_ig_data %>% 
   group_by(ego_can_infer, workerid) %>% 
-  summarize(
+  dplyr::summarize(
     total_condition_alt_occluded = sum(total_alt_occluded)) %>% 
   inner_join(alter_ig_data, by = c('ego_can_infer', 'workerid')) %>% 
   filter(response_alter_occluded) %>% 
@@ -414,8 +418,7 @@ aov.1 <- aov(probability_response_alter_occluded ~ ego_can_infer + workerid, dat
 summary(aov.1)
 ```
 
-
-##Interest in alter knowlege? RT
+###Interest in alter knowlege? RT
 ```{r}
 #take cases when participant can't see ball and can or can't infer it's position. Is participant more likely to select a position if the character can see it? 
 #Is this only the case when the participant can't infer the ball's location?
@@ -450,9 +453,9 @@ aov <- aov(rt ~ ego_can_infer*response_alter_occluded, data = alter_ig_data)
 summary(aov)
 ```
 
-# Analyses
+## Analyses
 
-## Proposed Analyses
+### Proposed Analyses
 ```{r}
 #RT
 alter_ig_data <- df.ex1.trials %>% 
@@ -467,17 +470,17 @@ av.0 <- aov(rt ~ ego_ball_visible * response_ego_occluded, data = alter_ig_data)
 summary(av.0)
 ```
 
-## Interest in alter knowledge
+### Interest in alter knowledge
 ```{r}
 
 #Responses
-df.glm.0 <- df.ex1.trials 
+#df.glm.0 <- df.ex1.trials 
 
 #is the participant more likely to select a position that is alter occluded when they know where the ball is? aka 
 #are they more likely to select an !alter_occluded position when they don't know where the ball is 
-glm.0 = glm(
-  response_alter_occluded ~ ego_can_infer + num_alter_occluders,
-  data = df.mult.0)
+#glm.0 = glm(
+#  response_alter_occluded ~ ego_can_infer + num_alter_occluders,
+#  data = df.mult.0)
 
 
 #using participant level probabilities of selecting an alter occluded position
@@ -508,11 +511,9 @@ aov.1 <- aov(probability_response_alter_occluded ~ ego_can_infer + workerid, dat
 summary(aov.1)
 
 ```
-###Post-hoc power analysis
-```{r}
 
-#eta-squaredfr ego_can_infer = 0.07 
-eta_squared(aov.1)
+####Post-hoc power analysis
+```{r}
 
 #cohens-f = 0.27 for affect of ego_can_infer
 cohens_f(aov.1)
@@ -521,9 +522,185 @@ cohens_f(aov.1)
 pwr.anova.test(k=2,            # 2 groups are compared
                f=.27,          # effect size due to ego_can_infer
                sig.level=.05,  # alpha/sig. level = .05
-               power=.8)       # confint./power = .8
+               power = 0.8)       # confint./power = .8
 #shows n=55
 ```
+
+#EXPERIMENT CONTROL
+
+##Load Data
+```{r}
+df.control.trials <- read_csv("../../data/experiment_control/ego_ignorance_thesis_control-trials.csv")
+```
+
+##Wrangle Data
+```{r}
+#quick function to count occluders in a string
+n_occluders <- Vectorize(function(x) {
+  return(sum(as.numeric(strsplit(x, '')[[1]])))
+})
+
+#add some info
+df.control.trials <- df.control.trials %>% 
+  mutate(
+    response_alter_occluded = case_when(
+      substring(alter_occluders, response+1, response+1) == '1' ~ TRUE,
+      TRUE ~ FALSE
+    ),
+    response_ego_occluded = case_when(
+      substring(ego_occluders, response+1, response+1) == '1' ~ TRUE,
+      TRUE ~ FALSE
+    ),
+    num_ego_occluders = n_occluders(ego_occluders),
+    num_alter_occluders = n_occluders(alter_occluders),
+    response_ball_position = (response==ball_pos),
+    ego_can_infer = case_when(
+                            ego_ball_visible ~ TRUE,
+                            num_ego_occluders == 1 ~ TRUE,
+                            TRUE ~ FALSE),
+    collective_can_infer = case_when(
+                            ego_can_infer & alter_can_infer ~ TRUE,
+                            TRUE ~ FALSE)
+    )
+```
+
+##Calculate Control Bonus info
+```{r}
+df.control.rewards <- read_csv("../../data/experiment_control/ego_ignorance_thesis_control-participants.csv")
+df.control.prolific_ids <- read_csv("../../data/experiment_control/ego_ignorance_thesis_control-workerids.csv")
+
+#merge bonuses with prolific ids
+df.control.rewards = df.control.rewards %>% 
+  select(workerid, bonus) %>% 
+  inner_join(df.control.prolific_ids) %>% 
+  select(-workerid) %>% 
+  relocate(prolific_participant_id) %>% 
+  mutate(
+    bonus = round(bonus, 2)
+  )
+
+#bonuses file, ready to paste into Prolific
+write.table(df.control.rewards, "../../data/experiment_control/control-bonuses.txt", sep = ",", col.names = FALSE, row.names = FALSE, quote=FALSE)
+```
+##Figures
+
+###Make right choice when there is one?
+-participants overwhelmingly choose the correct location when there is one
+```{r}
+
+control_good_choice <- df.control.trials %>%
+  count(ego_can_infer, accuracy) %>% 
+  rename(responses = n)
+
+fig1 <- ggplot(
+  data = control_good_choice,
+  mapping = aes(
+    x = ego_can_infer,
+    y = responses,
+    fill = accuracy)
+  ) +
+  geom_col(
+    position = 'dodge'
+  )
+
+
+fig1
+
+```
+
+###Interest in Alter Knowledge
+```{r}
+alter_ig_control_data <- df.control.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  count(ego_can_infer, response_alter_occluded)
+
+baseline_alter_occluded <- df.control.trials %>% 
+  filter(!ego_ball_visible)
+mean(baseline_alter_occluded$num_alter_occluders)
+
+fig1 <- ggplot(
+  data = alter_ig_control_data,
+  mapping = aes(
+    x = ego_can_infer,
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+```
+###Interest in Alter Knowledge from index
+
+```{r}
+control_alter_ig_data <- df.control.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  group_by(ego_can_infer, response_alter_occluded, workerid) %>% 
+  dplyr::summarize(
+    responses = n(),
+    total_alt_occluded = sum(num_alter_occluders)
+  )
+
+corrected_control_alter_ig_data <- control_alter_ig_data %>% 
+  group_by(ego_can_infer, workerid) %>% 
+  dplyr::summarize(
+    total_condition_alt_occluded = sum(total_alt_occluded)) %>% 
+  inner_join(control_alter_ig_data, by = c('ego_can_infer', 'workerid')) %>% 
+  filter(response_alter_occluded) %>% 
+  mutate(
+    probability_response_alter_occluded = responses / total_condition_alt_occluded
+  )
+
+
+fig1 <- ggplot(
+  data = corrected_control_alter_ig_data,
+  mapping = aes(
+    x = ego_can_infer,
+    y = probability_response_alter_occluded)
+  ) +
+  geom_boxplot(
+    position = 'dodge'
+  ) +
+  geom_point( position = 'jitter')
+
+fig1
+```
+
+
+##Analyses
+
+###Interest in alter knowledge
+```{r}
+#using participant level probabilities of selecting an alter occluded position
+control_alter_ig_data <- df.control.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  group_by(ego_can_infer, response_alter_occluded, workerid) %>% 
+  dplyr::summarize(
+    responses = n(),
+    total_alt_occluded = sum(num_alter_occluders)
+  )
+
+
+corrected_alter_ig_data <- alter_ig_data %>% 
+  group_by(ego_can_infer, workerid) %>% 
+  summarize(
+    total_condition_alt_occluded = sum(total_alt_occluded)) %>% 
+  inner_join(alter_ig_data, by = c('ego_can_infer', 'workerid')) %>% 
+  filter(response_alter_occluded) %>% 
+  mutate(
+    probability_response_alter_occluded = responses / total_condition_alt_occluded
+  )
+
+```
+
+
 
 
 
