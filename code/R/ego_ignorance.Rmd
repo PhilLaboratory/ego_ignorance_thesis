@@ -18,6 +18,7 @@ library(effectsize)
 library(pwr)
 library(tidyverse)
 ```
+
 #EXPERIMENT 1
 
 ##Load Data
@@ -511,6 +512,21 @@ aov.1 <- aov(probability_response_alter_occluded ~ ego_can_infer + workerid, dat
 summary(aov.1)
 
 ```
+###Interest in alter knowledge (GLM)
+```{r}
+
+df.ex1.glm.0 <- df.ex1.trials %>% 
+  filter(
+    !ego_ball_visible
+  )
+
+glm.0 <- glm(
+  formula = response_alter_occluded ~ ego_can_infer + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = df.ex1.glm.0)
+
+tidy(glm.0)
+```
+
 
 ####Post-hoc power analysis
 ```{r}
@@ -581,6 +597,8 @@ df.control.rewards = df.control.rewards %>%
 
 #bonuses file, ready to paste into Prolific
 write.table(df.control.rewards, "../../data/experiment_control/control-bonuses.txt", sep = ",", col.names = FALSE, row.names = FALSE, quote=FALSE)
+
+sum(df.control.rewards$bonus)
 ```
 ##Figures
 
@@ -618,7 +636,6 @@ alter_ig_control_data <- df.control.trials %>%
 
 baseline_alter_occluded <- df.control.trials %>% 
   filter(!ego_ball_visible)
-mean(baseline_alter_occluded$num_alter_occluders)
 
 fig1 <- ggplot(
   data = alter_ig_control_data,
@@ -698,6 +715,21 @@ corrected_alter_ig_data <- alter_ig_data %>%
     probability_response_alter_occluded = responses / total_condition_alt_occluded
   )
 
+```
+
+###Interest in alter knowledge (GLM)
+```{r}
+
+control_alter_ig_data <- df.control.trials %>% 
+  filter(
+    !ego_ball_visible
+  )
+
+glm.1 <- glm(
+  formula = response_alter_occluded ~ ego_can_infer + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = control_alter_ig_data)
+
+tidy(glm.1)
 ```
 
 
