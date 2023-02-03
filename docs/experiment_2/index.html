@@ -63,7 +63,7 @@ var jsPsych = initJsPsych({
 var trial_count = 144
 var practice_length = 10
 var stimulus_width = 0.7 //ratio of window width
-var max_bonus = 1.44
+var max_bonus = 1.00
 
 //------------------------------------------------------------------------------------------------------------------------------------------------
 //setup stimuli info and choose trials
@@ -112,7 +112,7 @@ for(var i = 0; i < stimuli_names.length; i++){
   } else if((parseInt(name[4]) + parseInt(name[5]) + parseInt(name[6])) == 1){
     var ego_can_infer = true
   } else {
-    var ego_can_infer = true
+    var ego_can_infer = false
   }
 
   //can the character see the ball? (whether or not the subject knows it?)
@@ -191,6 +191,7 @@ for(var i = 0; i < stimuli_names.length; i++){
 trials = []
 
 //add representative set of trials
+stimuli_names = jsPsych.randomization.shuffleNoRepeats(stimuli_names)
 for(var i=0; i<trial_count; i++){
   var name = stimuli_names[i]
   trials.push(name)
@@ -198,7 +199,6 @@ for(var i=0; i<trial_count; i++){
 
 //shuffle no repeats
 trials = jsPsych.randomization.shuffleNoRepeats(trials)
-console.log(trials.length)
 
 var practice_trials = jsPsych.randomization.shuffle(stimuli_names).slice(0,practice_length)
 
@@ -291,7 +291,7 @@ var intro_text = [ //create introductory text
    "<img src= stimuli/1111000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Regardless, you will need to predict which basket Sam will choose.</p>",
    "<img src= stimuli/keyboard_diagram.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>You will use your keyboard to respond.</p> <p> Throughout the experiment, please be ready to use your 'left arrow (<)', 'down arrow (v)', and 'right arrow (>)' keys to select the left, middle, or right basket.</p> <p> Your spacebar will be used to continue between trials. </p>",
    "<img src= stimuli/11010001.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Sam's responses have been prerecorded. After each trial, you will recieve feedback about whether your prediction was correct. A red rectangle will show you which basket Sam picked. </p>",
-   "<p> For each trial you answer correctly, you will receive a 1 cent bonus payment. <p> This experiment consists of 144 trials, so the maximum bonus is $1.44 .",
+   "<p> For each trial you answer correctly, you will receive a bonus payment. <p> This experiment consists of 144 trials. The maximum bonus is $1.00.",
    "Before we begin, let's practice!"]
 
 

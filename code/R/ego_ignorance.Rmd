@@ -93,6 +93,7 @@ df.ex1.rewards = df.ex1.participants %>%
 
 #bonuses file, ready to paste into Prolific
 write.table(df.ex1.rewards, "../../data/experiment_1/experiment_1-bonuses.txt", sep = ",", col.names = FALSE, row.names = FALSE, quote=FALSE)
+
 ```
 
 ##Figures
