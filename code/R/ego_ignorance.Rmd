@@ -650,6 +650,10 @@ fig1 <- ggplot(
   )
 
 fig1
+
+ggsave(filename = "../../figures/plots/control_alter_knowledge.pdf",
+       width = 8,
+       height = 4)
 ```
 ###Interest in Alter Knowledge from index
 
@@ -732,8 +736,278 @@ glm.1 <- glm(
 
 tidy(glm.1)
 ```
+#EXPERIMENT 2
+
+##Load Data
+```{r}
+df.ex2.trials <- read_csv("../../data/experiment_2/ego_ignorance_thesis_experiment_2-trials.csv")
+```
+
+##Wrangle Data
+```{r}
+#quick function to count occluders in a string
+n_occluders <- Vectorize(function(x) {
+  return(sum(as.numeric(strsplit(x, '')[[1]])))
+})
+
+#add some info
+df.ex2.trials <- df.ex2.trials %>% 
+  mutate(
+    response_alter_occluded = case_when(
+      substring(alter_occluders, response+1, response+1) == '1' ~ TRUE,
+      TRUE ~ FALSE
+    ),
+    response_ego_occluded = case_when(
+      substring(ego_occluders, response+1, response+1) == '1' ~ TRUE,
+      TRUE ~ FALSE
+    ),
+    num_ego_occluders = n_occluders(ego_occluders),
+    num_alter_occluders = n_occluders(alter_occluders),
+    response_ball_position = (response==ball_pos))
+```
+
+##Calculate Control Bonus info
+```{r}
+df.ex2.rewards <- read_csv("../../data/experiment_2/ego_ignorance_thesis_experiment_2-participants.csv")
+df.ex2.prolific_ids <- read_csv("../../data/experiment_2/ego_ignorance_thesis_experiment_2-workerids.csv")
+
+#merge bonuses with prolific ids
+df.ex2.rewards = df.ex2.rewards %>% 
+  select(workerid, bonus) %>% 
+  inner_join(df.ex2.prolific_ids) %>% 
+  select(-workerid) %>% 
+  relocate(prolific_participant_id) %>% 
+  mutate(
+    bonus = round(bonus, 2)
+  )
+
+#bonuses file, ready to paste into Prolific
+write.table(df.ex2.rewards, "../../data/experiment_2/ex2-bonuses.txt", sep = ",", col.names = FALSE, row.names = FALSE, quote=FALSE)
+
+mean(df.ex2.rewards$bonus)
+```
+
+##Figures
+
+###Interest in Alter Knowledge
+```{r}
+alter_ig_ex2_data <- df.ex2.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  count(ego_can_infer, response_alter_occluded)
+
+fig1 <- ggplot(
+  data = alter_ig_ex2_data,
+  mapping = aes(
+    x = ego_can_infer,
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+
+ggsave(filename = "../../figures/plots/exp2_alter_knowledge.pdf",
+       width = 8,
+       height = 4)
+```
+
+###Interest in Alter Knowledge (split by alter_can_infer)
+```{r}
+alter_ig_ex2_data <- df.ex2.trials %>% 
+  filter((!ego_ball_visible) & (!ego_can_infer) & (num_alter_occluders==1 | num_alter_occluders==2)) %>% 
+  count(num_alter_occluders, response_alter_occluded)
+
+fig1 <- ggplot(
+  data = alter_ig_ex2_data,
+  mapping = aes(
+    x = factor(num_alter_occluders),
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
 
 
+#filter to ego_occluders=111, and 1 or 2 alter occluders. Then, correct so it's the probaility of selecting a given position of the kind (half the value if there are twice as many of that kind)
+alter_ig_ex2_data <- df.ex2.trials %>% 
+  filter((!ego_ball_visible) & (!ego_can_infer) & (num_alter_occluders==1 | num_alter_occluders==2) & num_ego_occluders==3) %>% 
+  count(num_alter_occluders, response_alter_occluded) %>% 
+  mutate(
+    n = as.numeric(n),
+    n = case_when(
+      num_alter_occluders==1 & !response_alter_occluded ~ n/2,
+      num_alter_occluders==2 & response_alter_occluded ~ n/2,
+      TRUE ~ n
+    )
+  )
+
+fig1 <- ggplot(
+  data = alter_ig_ex2_data,
+  mapping = aes(
+    x = factor(num_alter_occluders),
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+```
+
+###Make right choice when there is one?
+-participants make the correct choice when there is one, and do not when there isn't
+```{r}
+
+#overall
+ex2_right_choice <- df.ex2.trials %>%
+  count(collective_can_infer, accuracy) %>% 
+  rename(responses = n)
+
+fig1 <- ggplot(
+  data = ex2_right_choice,
+  mapping = aes(
+    x = collective_can_infer,
+    y = responses,
+    fill = accuracy)
+  ) +
+  geom_col(
+    position = 'dodge'
+  )
+
+
+fig1
+
+```
+
+###Preference to select ball
+-if participants know where the ball is, they tend to select that position regardless of the knowledge state of the character
+```{r}
+
+#overall
+ex2_select_ball <- df.ex1.trials %>% 
+  count(ego_can_infer, response_ball_position) %>% 
+  rename(responses = n)
+
+fig1 <- ggplot(
+  data = ex2_select_ball,
+  mapping = aes(
+    x = ego_can_infer,
+    y = responses,
+    fill = response_ball_position)
+  ) +
+  geom_col(
+    position = 'dodge'
+  )
+
+
+fig1
+
+#for logical guesses, within conditions where ego_can_infer
+alter_ig_data <- df.ex1.trials %>% 
+  filter(ego_can_infer) %>% 
+  count(alter_can_infer, response_ball_position) %>% 
+  rename(responses = n)
+
+fig2 <- ggplot(
+  data = alter_ig_data,
+  mapping = aes(
+    x = alter_can_infer,
+    y = responses,
+    fill = response_ball_position)
+  ) +
+  geom_col(
+    position = 'dodge'
+  )
+
+
+fig2
+```
+
+###Interest in alter knowlege? RT
+```{r}
+#take cases when participant can't see ball and can or can't infer it's position. Are participants more likely to select a position if the character can see it? 
+#Is this only the case when the participant can't infer the ball's location?
+
+alter_ig_data <- df.ex2.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  group_by(ego_can_infer, response_alter_occluded, workerid) %>% 
+  filter(rt < 4000) %>% 
+  summarize(
+    rt = mean(rt)
+  )
+
+fig1 <- ggplot(
+  data = alter_ig_data,
+  mapping = aes(
+    x = ego_can_infer,
+    y = rt,
+    fill = response_alter_occluded)
+  ) +
+  geom_boxplot(
+    position = 'dodge'
+  ) + 
+  geom_point(
+    position = 'jitter'
+  )
+
+fig1
+```
+
+##Analyses
+
+###Interest in alter knowledge from responses (GLM)
+```{r}
+
+ex2_alter_ig_data <- df.ex2.trials %>% 
+  filter(
+    !ego_ball_visible
+  )
+
+glm.2 <- glmer(
+  formula = response_alter_occluded ~ ego_can_infer + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = ex2_alter_ig_data,
+  family = 'binomial')
+
+glm.3 <- glmer(
+  formula = response_alter_occluded ~ 1 + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = ex2_alter_ig_data,
+  family = 'binomial')
+
+aov.1 <- anova(glm.2, glm.3)
+
+aov.1
+```
+
+###Interest in alter knowledge from rt (GLM)
+
+```{r}
+
+ex2_alter_ig_data <- df.ex2.trials %>% 
+  filter(
+    !ego_ball_visible
+  )
+
+lm.1 <- lmer(
+  formula = rt ~ ego_can_infer + response_alter_occluded + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = ex2_alter_ig_data)
+
+
+lm.2 <- lmer(
+  formula = rt ~ response_alter_occluded + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = ex2_alter_ig_data)
+
+anova(lm.1, lm.2)
+```
 
 
 
