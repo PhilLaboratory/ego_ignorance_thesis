@@ -860,6 +860,32 @@ fig1 <- ggplot(
   )
 
 fig1
+
+#filter to 1 or 2 alter occluders. Then, correct so it's the probaility of selecting a given position of the kind (half the value if there are twice as many of that kind)
+alter_ig_ex2_data <- df.ex2.trials %>% 
+  filter((!ego_ball_visible) & (!ego_can_infer) & (num_alter_occluders==1 | num_alter_occluders==2)) %>% 
+  count(num_alter_occluders, response_alter_occluded) %>% 
+  mutate(
+    n = as.numeric(n),
+    n = case_when(
+      num_alter_occluders==1 & !response_alter_occluded ~ n/2,
+      num_alter_occluders==2 & response_alter_occluded ~ n/2,
+      TRUE ~ n
+    )
+  )
+
+fig1 <- ggplot(
+  data = alter_ig_ex2_data,
+  mapping = aes(
+    x = factor(num_alter_occluders),
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
 ```
 
 ###Make right choice when there is one?
@@ -1009,6 +1035,207 @@ lm.2 <- lmer(
 anova(lm.1, lm.2)
 ```
 
+#EXPERIMENT 3
 
+##Load Data
+```{r}
+df.ex3.trials <- read_csv("../../data/experiment_3/ego_ignorance_thesis_experiment_3-trials.csv")
+```
+
+##Wrangle Data
+```{r}
+#quick function to count occluders in a string
+n_occluders <- Vectorize(function(x) {
+  return(sum(as.numeric(strsplit(x, '')[[1]])))
+})
+
+#add some info
+df.ex3.trials <- df.ex3.trials %>% 
+  mutate(
+    response_alter_occluded = case_when(
+      substring(alter_occluders, response+1, response+1) == '1' ~ TRUE,
+      TRUE ~ FALSE
+    ),
+    response_ego_occluded = case_when(
+      substring(ego_occluders, response+1, response+1) == '1' ~ TRUE,
+      TRUE ~ FALSE
+    ),
+    num_ego_occluders = n_occluders(ego_occluders),
+    num_alter_occluders = n_occluders(alter_occluders),
+    response_ball_position = (response==ball_pos))
+```
+
+##Calculate Control Bonus info
+```{r}
+df.ex3.rewards <- read_csv("../../data/experiment_3/ego_ignorance_thesis_experiment_3-participants.csv")
+df.ex3.prolific_ids <- read_csv("../../data/experiment_3/ego_ignorance_thesis_experiment_3-workerids.csv")
+
+# one participant 5ec0ba1bfa01894cceaa1b8e did not finish with a completion code, and their data were not recorded
+
+#merge bonuses with prolific ids
+df.ex3.rewards = df.ex3.rewards %>% 
+  select(workerid, bonus) %>% 
+  inner_join(df.ex3.prolific_ids) %>% 
+  select(-workerid) %>% 
+  relocate(prolific_participant_id) %>% 
+  mutate(
+    bonus = round(bonus, 2)
+  )
+
+#bonuses file, ready to paste into Prolific
+write.table(df.ex3.rewards, "../../data/experiment_3/ex3-bonuses.txt", sep = ",", col.names = FALSE, row.names = FALSE, quote=FALSE)
+
+mean(df.ex3.rewards$bonus)
+```
+
+##Figures
+
+###Interest in Alter Knowledge
+```{r}
+alter_ig_ex3_data <- df.ex3.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  count(ego_can_infer, response_alter_occluded)
+
+fig1 <- ggplot(
+  data = alter_ig_ex3_data,
+  mapping = aes(
+    x = ego_can_infer,
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+
+ggsave(filename = "../../figures/plots/exp3_alter_knowledge.pdf",
+       width = 8,
+       height = 4)
+```
+
+###Interest in Alter Knowledge (split by alter_can_infer)
+```{r}
+alter_ig_ex3_data <- df.ex3.trials %>% 
+  filter((!ego_ball_visible) & (!ego_can_infer) & (num_alter_occluders==1 | num_alter_occluders==2)) %>% 
+  count(num_alter_occluders, response_alter_occluded)
+
+fig1 <- ggplot(
+  data = alter_ig_ex3_data,
+  mapping = aes(
+    x = factor(num_alter_occluders),
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+
+
+#filter to ego_occluders=111, and 1 or 2 alter occluders. Then, correct so it's the probaility of selecting a given position of the kind (half the value if there are twice as many of that kind)
+alter_ig_ex3_data <- df.ex3.trials %>% 
+  filter((!ego_ball_visible) & (!ego_can_infer) & (num_alter_occluders==1 | num_alter_occluders==2) & num_ego_occluders==3) %>% 
+  count(num_alter_occluders, response_alter_occluded) %>% 
+  mutate(
+    n = as.numeric(n),
+    n = case_when(
+      num_alter_occluders==1 & !response_alter_occluded ~ n/2,
+      num_alter_occluders==2 & response_alter_occluded ~ n/2,
+      TRUE ~ n
+    )
+  )
+
+fig1 <- ggplot(
+  data = alter_ig_ex3_data,
+  mapping = aes(
+    x = factor(num_alter_occluders),
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+
+#filter to 1 or 2 alter occluders. Then, correct so it's the probaility of selecting a given position of the kind (half the value if there are twice as many of that kind)
+alter_ig_ex3_data <- df.ex3.trials %>% 
+  filter((!ego_ball_visible) & (!ego_can_infer) & (num_alter_occluders==1 | num_alter_occluders==2)) %>% 
+  count(num_alter_occluders, response_alter_occluded) %>% 
+  mutate(
+    n = as.numeric(n),
+    n = case_when(
+      num_alter_occluders==1 & !response_alter_occluded ~ n/2,
+      num_alter_occluders==2 & response_alter_occluded ~ n/2,
+      TRUE ~ n
+    )
+  )
+
+fig1 <- ggplot(
+  data = alter_ig_ex3_data,
+  mapping = aes(
+    x = factor(num_alter_occluders),
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+```
+
+###Make right choice when there is one?
+-participants overwhelmingly choose the correct location when there is one
+```{r}
+
+ex3_good_choice <- df.ex3.trials %>%
+  count(ego_can_infer, accuracy) %>% 
+  rename(responses = n)
+
+fig1 <- ggplot(
+  data = ex3_good_choice,
+  mapping = aes(
+    x = ego_can_infer,
+    y = responses,
+    fill = accuracy)
+  ) +
+  geom_col(
+    position = 'dodge'
+  )
+
+
+fig1
+
+```
+
+##Analyses
+
+###Interest in alter knowledge from responses (GLM)
+```{r}
+
+ex3_alter_ig_data <- df.ex3.trials %>% 
+  filter(
+    !ego_ball_visible
+  )
+
+glm.4 <- glmer(
+  formula = response_alter_occluded ~ ego_can_infer + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = ex3_alter_ig_data,
+  family = 'binomial')
+
+glm.5 <- glmer(
+  formula = response_alter_occluded ~ 1 + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = ex3_alter_ig_data,
+  family = 'binomial')
+
+aov.2 <- anova(glm.4, glm.5)
+
+aov.2
+```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
