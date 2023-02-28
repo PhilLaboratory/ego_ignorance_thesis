@@ -455,6 +455,80 @@ aov <- aov(rt ~ ego_can_infer*response_alter_occluded, data = alter_ig_data)
 summary(aov)
 ```
 
+
+###Interest in Alter Knowledge (split by alter_can_infer)
+```{r}
+alter_ig_ex1_data <- df.ex1.trials %>% 
+  filter((!ego_ball_visible) & (!ego_can_infer) & (num_alter_occluders==1 | num_alter_occluders==2)) %>% 
+  count(num_alter_occluders, response_alter_occluded)
+
+fig1 <- ggplot(
+  data = alter_ig_ex1_data,
+  mapping = aes(
+    x = factor(num_alter_occluders),
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+
+
+#filter to ego_occluders=111, and 1 or 2 alter occluders. Then, correct so it's the probaility of selecting a given position of the kind (half the value if there are twice as many of that kind)
+alter_ig_ex1_data <- df.ex1.trials %>% 
+  filter((!ego_ball_visible) & (!ego_can_infer) & (num_alter_occluders==1 | num_alter_occluders==2) & num_ego_occluders==3) %>% 
+  count(num_alter_occluders, response_alter_occluded) %>% 
+  mutate(
+    n = as.numeric(n),
+    n = case_when(
+      num_alter_occluders==1 & !response_alter_occluded ~ n/2,
+      num_alter_occluders==2 & response_alter_occluded ~ n/2,
+      TRUE ~ n
+    )
+  )
+
+fig1 <- ggplot(
+  data = alter_ig_ex1_data,
+  mapping = aes(
+    x = factor(num_alter_occluders),
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+
+#filter to 1 or 2 alter occluders. Then, correct so it's the probaility of selecting a given position of the kind (half the value if there are twice as many of that kind)
+alter_ig_ex1_data <- df.ex1.trials %>% 
+  filter((!ego_ball_visible) & (!ego_can_infer) & (num_alter_occluders==1 | num_alter_occluders==2)) %>% 
+  count(num_alter_occluders, response_alter_occluded) %>% 
+  mutate(
+    n = as.numeric(n),
+    n = case_when(
+      num_alter_occluders==1 & !response_alter_occluded ~ n/2,
+      num_alter_occluders==2 & response_alter_occluded ~ n/2,
+      TRUE ~ n
+    )
+  )
+
+fig1 <- ggplot(
+  data = alter_ig_ex1_data,
+  mapping = aes(
+    x = factor(num_alter_occluders),
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+```
+
 ## Analyses
 
 ### Proposed Analyses
@@ -880,6 +954,47 @@ fig1 <- ggplot(
     x = factor(num_alter_occluders),
     y = n,
     fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+
+
+#filter to 1 or 2 alter occluders. Then, correct so it's the probaility of selecting a given position of the kind (half the value if there are twice as many of that kind)
+alter_ig_ex2_data <- df.ex2.trials %>% 
+  filter((!ego_ball_visible) & (!ego_can_infer) & (num_alter_occluders==2)) %>% 
+  count(alter_occluders, response_alter_occluded) %>% 
+  mutate(
+    n = as.numeric(n),
+    n = case_when(
+      response_alter_occluded ~ n/2,
+      TRUE ~ n
+    )
+  )
+
+fig1 <- ggplot(
+  data = alter_ig_ex2_data,
+  mapping = aes(
+    x = factor(alter_occluders),
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+
+alter_ig_ex2_data <- df.ex2.trials %>% 
+  count(response)
+
+fig1 <- ggplot(
+  data = alter_ig_ex2_data,
+  mapping = aes(
+    x = factor(response),
+    y = n)
   ) +
   geom_col(
     position='dodge'
