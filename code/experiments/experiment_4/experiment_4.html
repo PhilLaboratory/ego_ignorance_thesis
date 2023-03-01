@@ -60,7 +60,9 @@ var jsPsych = initJsPsych({
     });
 
 //define variables
-var trial_count = 144
+var key_trial_count = 50 //times two!! each key trial will be shown as a trick trial and non-trick trial
+var filler_trial_count = 50
+var trial_count = key_trial_count*2 + filler_trial_count
 var practice_length = 10
 var stimulus_width = 0.7 //ratio of window width
 var max_bonus = 1.00
@@ -91,9 +93,15 @@ var stimuli_names = ['0000000', '0000001', '0000010', '0000011', '0000100', '000
 var trick_stimuli_names = []
 for(var i = 0; i < stimuli_names.length; i++){
   var name = [stimuli_names[i]]
-  trick_stimuli_names.push('3' + name.substring(1))
-  console.log('3' + name.substring(1))
+
+  //only add a trick trial is there is at least one alter occluder (otherwise the 'trick' would be revealed)
+  if((parseInt(name[1]) + parseInt(name[2]) + parseInt(name[3])) >= 1){
+    trick_stimuli_names.push('3' + name.substring(1))
+  }
 }
+
+//add trick trials in with non trick ones
+stimuli_names = stimuli_names.concat(trick_stimuli_names)
 
 //create dict with all information relevant to stimuli
 var stimuli = {}
@@ -103,14 +111,21 @@ for(var i = 0; i < stimuli_names.length; i++){
   //where's the ball?
   var ball_pos = parseInt(name[0])
 
+  //is it a 'trick tial'?
+  if(ball_pos == 3){
+    var trick_trial = true
+  }
+
   //where are the occluders?
   var alter_occluders = name.substring(1,4)
   var ego_occluders = name.substring(4)
 
   //can the participant see the ball?
-  if(name[ball_pos + 4] == '1') {
+  if(trick_trial) {
+    var ego_ball_visible = true
+  } else if(name[ball_pos + 4] == '1') {
         var ego_ball_visible = false
-      } else {
+  } else {
         var ego_ball_visible = true
       }
 
@@ -124,13 +139,15 @@ for(var i = 0; i < stimuli_names.length; i++){
   }
 
   //can the character see the ball? (whether or not the subject knows it?)
-  if(name[ball_pos + 1] == '1') {
+  if(trick_trial) {
+      var alter_ball_visible = false
+  } else if(name[ball_pos + 1] == '1') {
         var alter_ball_visible = false
       } else {
         var alter_ball_visible = true
       }
 
-  //can the character infer the location of the ball (even if not seen?)
+  //can the character infer the location of the ball (even if not seen? this ignores the possibility of trick trials)
   if(alter_ball_visible){
     var alter_can_infer = true
   } else if((parseInt(name[1]) + parseInt(name[2]) + parseInt(name[3])) <= 1){
@@ -163,7 +180,7 @@ for(var i = 0; i < stimuli_names.length; i++){
 
   //Where might the character search?
   var search_locations = []
-  if(alter_can_infer){ //if the character can infer the ball location, they'll search there
+  if(alter_can_infer & !trick_trial){ //if the character can genuinely infer the ball location, they'll search there
     search_locations = [ball_pos]
   } else { //else, select from among the alter occluded positions
     if(parseInt(name[1])==1){
@@ -178,11 +195,31 @@ for(var i = 0; i < stimuli_names.length; i++){
   }
   search_locations = jsPsych.randomization.shuffle(search_locations) //shuffle options, the answer will be defined as the first in the list
 
+  //Is this a 'key trial' for this experiment?
+  //here we're interested in cases in non-trick trials in which the participant can't see the ball, and in which the character has at least one occluder. 
+  //We also exclude cases where the participant can see nothing at all
+  //there are 72 of these trials 
+  if((!ego_ball_visible) & ((parseInt(name[1]) + parseInt(name[2]) + parseInt(name[3]))) >= 1 & (alter_occluders != '111')) {
+      var key_trial = true
+    } else {
+      var key_trial = false
+    }
+
+  if(key_trial){
+    var filler_trial = false
+  } else if(!trick_trial) {
+    var filler_trial = true
+  } else {
+    filler_trial = false
+  }
 
 
   stimuli[name] = {
     filepath: 'stimuli/' + name + '.jpg',
     ball_pos: ball_pos,
+    trick_trial: trick_trial,
+    filler_trial: filler_trial,
+    key_trial: key_trial,
     ego_ball_visible: ego_ball_visible,
     ego_can_infer: ego_can_infer,
     alter_ball_visible: alter_ball_visible,
@@ -195,19 +232,53 @@ for(var i = 0; i < stimuli_names.length; i++){
   }
 }
 
+// //count key trials 
+// var counter = 0
+// for(var i = 0; i < stimuli_names.length; i++){
+//   var name = stimuli_names[i]
+//   if(stimuli[name]['key_trial']){
+//     counter = counter + 1
+//   }
+// }
+// console.log(counter)
+
 //define trial sequence
 trials = []
 
-//add representative set of trials
-stimuli_names = jsPsych.randomization.shuffleNoRepeats(stimuli_names)
-for(var i=0; i<trial_count; i++){
+//gather a list of key trials and filler trials
+var key_trials = []
+var filler_trials = []
+
+for(var i=0; i<stimuli_names.length; i++){
   var name = stimuli_names[i]
+  if(stimuli[name]['key_trial']){
+    key_trials.push(name)
+  } else if(stimuli[name]['filler_trial']){
+    filler_trials.push(name)
+  }
+  }
+
+//create trial sequence
+
+//add key trials and matched trick trials
+key_trials = jsPsych.randomization.shuffle(key_trials) //ensure a random set of key trials are selected
+for(var i=0; i<key_trial_count; i++){
+  var name = key_trials[i]
+  trials.push(name)
+  trials.push('3' + name.substring(1))
+  }
+
+//add filler trials
+filler_trials = jsPsych.randomization.shuffle(filler_trials) //ensure a random set of filler trials are selected
+for(var i=0; i<filler_trial_count; i++){
+  var name = filler_trials[i]
   trials.push(name)
   }
 
 //shuffle no repeats
 trials = jsPsych.randomization.shuffleNoRepeats(trials)
 
+//make practice trials truly random
 var practice_trials = jsPsych.randomization.shuffle(stimuli_names).slice(0,practice_length)
 
 //------------------------------------------------------------------------------------------------------------------------------------------------
@@ -301,7 +372,7 @@ var intro_text = [ //create introductory text
    "<img src= stimuli/3010000.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>In these trials, Sam will still think the ball is hidden in one of the three baskets on top of the table. You will need to predict which of the three baskets Sam will choose to search for the ball.</p>",
    "<img src= stimuli/keyboard_diagram.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>You will use your keyboard to respond.</p> <p> Throughout the experiment, please be ready to use your 'left arrow (<)', 'down arrow (v)', and 'right arrow (>)' keys to select the left, middle, or right basket.</p> <p> Your spacebar will be used to continue between trials. </p>",
    "<img src= stimuli/11010001.jpg style=width:"+String(window_width*stimulus_width)+"px> </img> <p>Sam's responses have been prerecorded. After each trial, you will recieve feedback about whether your prediction was correct. A red rectangle will show you which basket Sam picked. </p>",
-   "<p> For each trial you answer correctly, you will receive a bonus payment. <p> This experiment consists of 144 trials. The maximum bonus is $1.00.",
+   "<p> For each trial you answer correctly, you will receive a bonus payment. <p> This experiment consists of 150 trials. The maximum bonus is $1.00.",
    "Before we begin, let's practice!"]
 
 
@@ -365,7 +436,7 @@ stimulus: "stimuli/" + stimulus + String(character_choice) + ".jpg",
 choices: [" "],
 stimulus_width: window_width*stimulus_width,
 data: {
-  trial: "practrice_feedback",
+  trial: "practice_feedback",
   character_choice: stimuli[stimulus]['search_locations'][0]
 }
 }
