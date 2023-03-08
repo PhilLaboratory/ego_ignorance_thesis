@@ -60,12 +60,12 @@ var jsPsych = initJsPsych({
     });
 
 //define variables
-var key_trial_count = 50 //times two!! each key trial will be shown as a trick trial and non-trick trial
-var filler_trial_count = 50
+var key_trial_count = 54 //times two!! each key trial will be shown as a trick trial and non-trick trial
+var filler_trial_count = 54
 var trial_count = key_trial_count*2 + filler_trial_count
 var practice_length = 10
 var stimulus_width = 0.7 //ratio of window width
-var max_bonus = 1.00
+var max_bonus = 1.10
 
 //------------------------------------------------------------------------------------------------------------------------------------------------
 //setup stimuli info and choose trials
@@ -196,10 +196,10 @@ for(var i = 0; i < stimuli_names.length; i++){
   search_locations = jsPsych.randomization.shuffle(search_locations) //shuffle options, the answer will be defined as the first in the list
 
   //Is this a 'key trial' for this experiment?
-  //here we're interested in cases in non-trick trials in which the participant can't see the ball, and in which the character has at least one occluder. 
+  //here we're interested in cases in non-trick trials in which the participant can't see the ball pr infer its location, and in which the character has at least one occluder. 
   //We also exclude cases where the participant can see nothing at all
-  //there are 72 of these trials 
-  if((!ego_ball_visible) & ((parseInt(name[1]) + parseInt(name[2]) + parseInt(name[3]))) >= 1 & (alter_occluders != '111')) {
+  //there are 54 of these trials 
+  if((!ego_can_infer) & ((parseInt(name[1]) + parseInt(name[2]) + parseInt(name[3]))) >= 1 & (alter_occluders != '111')) {
       var key_trial = true
     } else {
       var key_trial = false
@@ -265,7 +265,7 @@ key_trials = jsPsych.randomization.shuffle(key_trials) //ensure a random set of 
 for(var i=0; i<key_trial_count; i++){
   var name = key_trials[i]
   trials.push(name)
-  trials.push('3' + name.substring(1))
+  trials.push('3' + name.substring(1)) //add matched trick trials
   }
 
 //add filler trials
@@ -580,6 +580,9 @@ timeline.push(instructions)
       data: {
         trial: "prediction_trial",
         character_choice: character_choice,
+        trick_trial: stimuli[stimulus]["trick_trial"],
+        key_trial: stimuli[stimulus]["key_trial"],
+        filler_trial: stimuli[stimulus]["filler_trial"],
         ball_pos: stimuli[stimulus]["ball_pos"],
         ego_ball_visible: stimuli[stimulus]["ego_ball_visible"],
         ego_can_infer: stimuli[stimulus]["ego_can_infer"],
