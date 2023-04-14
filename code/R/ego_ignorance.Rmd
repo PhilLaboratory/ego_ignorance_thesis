@@ -889,6 +889,63 @@ ggsave(filename = "../../figures/plots/exp2_alter_knowledge.pdf",
        height = 4)
 ```
 
+###Interest in Alter Knowledge in complete ego_ignorance
+```{r}
+alter_ig_ex2_data <- df.ex2.trials %>% 
+  filter(
+    ego_occluders == '111' & (num_alter_occluders == 1 | num_alter_occluders == 2)
+  ) %>% 
+  count(response_alter_occluded)
+
+fig1 <- ggplot(
+  data = alter_ig_ex2_data,
+  mapping = aes(
+    x = response_alter_occluded,
+    y = n)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+
+ggsave(filename = "../../figures/plots/exp2_alter_knowledge.pdf",
+       width = 8,
+       height = 4)
+
+
+alter_ig_ex2_data <- df.ex2.trials %>% 
+  filter(
+    ego_occluders == '111' & (num_alter_occluders == 1 | num_alter_occluders == 2)
+  ) %>% 
+  count(num_alter_occluders, response_alter_occluded)  %>% 
+  mutate(
+    n = as.numeric(n),
+    n = case_when(
+      num_alter_occluders==1 & !response_alter_occluded ~ n/2,
+      num_alter_occluders==2 & response_alter_occluded ~ n/2,
+      TRUE ~ n
+    )
+  )
+
+fig1 <- ggplot(
+  data = alter_ig_ex2_data,
+  mapping = aes(
+    x = factor(num_alter_occluders),
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+
+ggsave(filename = "../../figures/plots/exp2_alter_knowledge.pdf",
+       width = 8,
+       height = 4)
+```
+
 ###Interest in Alter Knowledge (split by alter_can_infer)
 ```{r}
 alter_ig_ex2_data <- df.ex2.trials %>% 
@@ -995,6 +1052,26 @@ fig1 <- ggplot(
   mapping = aes(
     x = factor(response),
     y = n)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+
+#considering only ego_occ=111, filter to 1 or 2 alter occluders. Then, correct so it's the probaility of selecting a given position of the kind (half the value if there are twice as many of that kind)
+alter_ig_ex2_data <- df.ex2.trials %>% 
+  filter((!ego_ball_visible) & (!ego_can_infer) & (num_alter_occluders==2 | num_alter_occluders==1)) %>% 
+  filter(ego_occluders == '111') %>% 
+  count(num_alter_occluders, response_alter_occluded)
+
+
+fig1 <- ggplot(
+  data = alter_ig_ex2_data,
+  mapping = aes(
+    x = factor(num_alter_occluders),
+    y = n,
+    fill = response_alter_occluded)
   ) +
   geom_col(
     position='dodge'
@@ -1352,5 +1429,224 @@ aov.2 <- anova(glm.4, glm.5)
 
 aov.2
 ```
+
+#EXPERIMENT 4
+
+##Load Data
+```{r}
+df.ex4.trials <- read_csv("../../data/experiment_4/ego_ignorance_thesis_experiment_4-trials.csv")
+```
+
+##Wrangle Data
+```{r}
+#quick function to count occluders in a string
+n_occluders <- Vectorize(function(x) {
+  return(sum(as.numeric(strsplit(x, '')[[1]])))
+})
+
+#add some info
+df.ex4.trials <- df.ex4.trials %>% 
+  mutate(
+    response_alter_occluded = case_when(
+      substring(alter_occluders, response+1, response+1) == '1' ~ TRUE,
+      TRUE ~ FALSE
+    ),
+    response_ego_occluded = case_when(
+      substring(ego_occluders, response+1, response+1) == '1' ~ TRUE,
+      TRUE ~ FALSE
+    ),
+    num_ego_occluders = n_occluders(ego_occluders),
+    num_alter_occluders = n_occluders(alter_occluders),
+    response_ball_position = (response==ball_pos),
+    trial_type = case_when(trick_trial~'trick', filler_trial~'filler', key_trial~'key'))
+```
+
+##Calculate Bonus info
+```{r}
+df.ex4.rewards <- read_csv("../../data/experiment_4/ego_ignorance_thesis_experiment_4-participants.csv")
+df.ex4.prolific_ids <- read_csv("../../data/experiment_4/ego_ignorance_thesis_experiment_4-workerids.csv")
+
+# one participant 5ec0ba1bfa01894cceaa1b8e did not finish with a completion code, and their data were not recorded
+
+#merge bonuses with prolific ids
+df.ex4.rewards = df.ex4.rewards %>% 
+  select(workerid, bonus) %>% 
+  inner_join(df.ex4.prolific_ids) %>% 
+  select(-workerid) %>% 
+  relocate(prolific_participant_id) %>% 
+  mutate(
+    bonus = round(bonus, 2)
+  )
+
+#bonuses file, ready to paste into Prolific
+write.table(df.ex4.rewards, "../../data/experiment_4/ex4-bonuses.txt", sep = ",", col.names = FALSE, row.names = FALSE, quote=FALSE)
+
+mean(df.ex4.rewards$bonus)
+```
+##Figures
+
+###Interest in Alter Knowledge
+```{r}
+alter_ig_ex4_data <- df.ex4.trials %>% 
+  filter(
+    key_trial | trick_trial
+  ) %>% 
+  count(trial_type, response_alter_occluded)
+
+fig1 <- ggplot(
+  data = alter_ig_ex4_data,
+  mapping = aes(
+    x = trial_type,
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+```
+###Examine Filler Trials
+```{r}
+#select filler trials from ex4
+ex4_fillers <- df.ex4.trials %>% 
+  filter(
+    filler_trial
+  ) %>% 
+  mutate(experiment = 4) %>% 
+  select(alter_can_infer, ego_can_infer, num_alter_occluders, num_ego_occluders, response_alter_occluded, experiment, workerid)
+
+#select ex2 trials that are analogous to ex4 fillers
+ex2_fillers <- df.ex2.trials %>% 
+  filter(!(!ego_can_infer & num_alter_occluders >=1 & alter_occluders != '111')) %>% 
+  mutate(experiment = 2) %>% 
+  select(alter_can_infer, ego_can_infer, num_alter_occluders, num_ego_occluders, response_alter_occluded, experiment, workerid)
+
+#put ex2 and ex4 fillers together
+compare_fillers <- rbind(ex4_fillers, ex2_fillers)
+
+#summarize for figure
+compare_fillers_fig <- compare_fillers %>% 
+  count(experiment, response_alter_occluded)
+
+fig1 <- ggplot(
+  data = compare_fillers_fig,
+  mapping = aes(
+    x = factor(experiment),
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+
+#summarise baseline occurances in ex2 and ex4 fillers
+summarise_fillers <- compare_fillers %>% 
+  mutate(
+    alter_can_infer = case_when(alter_can_infer ~ 1, TRUE ~ 0),
+    ego_can_infer = case_when(ego_can_infer ~ 1, TRUE ~ 0)
+         ) %>% 
+  group_by(experiment) %>% 
+  summarise(
+    mean_alter_occs = mean(num_alter_occluders),
+    mean_ego_can_infer = mean(ego_can_infer),
+    mean_alter_can_infer = mean(alter_can_infer)) 
+
+summarise_fillers
+```
+
+###Ego Occlusion Effect
+- In trick trials, participants were vastly more likely to select positions they could not see, AND the character could not see (mutually occluded positions). In all trick trials, though, there were either two or three ego occluded positions, so this is expected.
+```{r}
+alter_ig_ex4_data <- df.ex4.trials %>% 
+  filter(
+    trick_trial
+  ) %>% 
+  count(response_ego_occluded, response_alter_occluded)
+
+fig1 <- ggplot(
+  data = alter_ig_ex4_data,
+  mapping = aes(
+    x = response_alter_occluded,
+    y = n,
+    fill = response_ego_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+
+alter_ig_ex4_data <- df.ex4.trials %>% 
+  filter(
+    key_trial
+  ) %>% 
+  count(response_ego_occluded, response_alter_occluded)
+
+fig1 <- ggplot(
+  data = alter_ig_ex4_data,
+  mapping = aes(
+    x = response_alter_occluded,
+    y = n,
+    fill = response_ego_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+```
+
+#Analyses
+
+##Preregistered Analysis
+```{r}
+
+
+ex4_alter_ig_data <- df.ex4.trials %>% 
+  filter(
+    trick_trial | key_trial
+  )
+
+glm.6 <- glmer(
+  formula = response_alter_occluded ~ trick_trial + num_alter_occluders + (trick_trial + 
+     num_alter_occluders|workerid),  
+  data = ex4_alter_ig_data,
+  family = 'binomial')
+
+glm.7 <- glmer(
+  formula = response_alter_occluded ~ 1 + num_alter_occluders + ( 
+     num_alter_occluders|workerid),  
+  data = ex4_alter_ig_data,
+  family = 'binomial')
+
+aov.3 <- anova(glm.6, glm.7)
+
+tidy(aov.3)
+```
+
+##Examine Baseline Differences
+```{r}
+
+glm.6 <- glmer(
+  formula = response_alter_occluded ~ experiment + num_alter_occluders + (experiment + 
+     num_alter_occluders|workerid),  
+  data = compare_fillers,
+  family = 'binomial')
+
+glm.7 <- glmer(
+  formula = response_alter_occluded ~ 1 + num_alter_occluders + ( 
+     num_alter_occluders|workerid),  
+  data = compare_fillers,
+  family = 'binomial')
+
+aov.3 <- anova(glm.6, glm.7)
+
+tidy(aov.3)
+```
+
+
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
