@@ -1646,7 +1646,86 @@ aov.3 <- anova(glm.6, glm.7)
 
 tidy(aov.3)
 ```
+#EXPERIMENT 5
 
+##Load Data
+```{r}
+df.ex5.trials <- read_csv("../../data/experiment_5/ego_ignorance_thesis_experiment_5-trials.csv")
+```
+
+##Wrangle Data
+```{r}
+#quick function to count occluders in a string
+n_occluders <- Vectorize(function(x) {
+  return(sum(as.numeric(strsplit(x, '')[[1]])))
+})
+
+#add some info
+df.ex5.trials <- df.ex5.trials %>% 
+  mutate(
+    response_alter_occluded = case_when(
+      substring(alter_occluders, response+1, response+1) == '1' ~ TRUE,
+      TRUE ~ FALSE
+    ),
+    response_ego_occluded = case_when(
+      substring(ego_occluders, response+1, response+1) == '1' ~ TRUE,
+      TRUE ~ FALSE
+    ),
+    num_ego_occluders = n_occluders(ego_occluders),
+    num_alter_occluders = n_occluders(alter_occluders),
+    response_ball_position = (response==ball_pos))
+```
+
+##Calculate Bonus info
+```{r}
+df.ex5.rewards <- read_csv("../../data/experiment_5/ego_ignorance_thesis_experiment_5-participants.csv")
+df.ex5.prolific_ids <- read_csv("../../data/experiment_5/ego_ignorance_thesis_experiment_5-workerids.csv")
+
+# one participant 5ec0ba1bfa01894cceaa1b8e did not finish with a completion code, and their data were not recorded
+
+#merge bonuses with prolific ids
+df.ex5.rewards = df.ex5.rewards %>% 
+  select(workerid, bonus) %>% 
+  inner_join(df.ex5.prolific_ids) %>% 
+  select(-workerid) %>% 
+  relocate(prolific_participant_id) %>% 
+  mutate(
+    bonus = round(bonus, 2)
+  )
+
+#bonuses file, ready to paste into Prolific
+write.table(df.ex5.rewards, "../../data/experiment_5/ex5-bonuses.txt", sep = ",", col.names = FALSE, row.names = FALSE, quote=FALSE)
+
+mean(df.ex5.rewards$bonus)
+```
+
+##Figures
+
+###Interest in Alter Knowledge
+```{r}
+alter_ig_ex5_data <- df.ex5.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  count(ego_can_infer, response_alter_occluded)
+
+fig1 <- ggplot(
+  data = alter_ig_ex5_data,
+  mapping = aes(
+    x = ego_can_infer,
+    y = n,
+    fill = response_alter_occluded)
+  ) +
+  geom_col(
+    position='dodge'
+  )
+
+fig1
+
+ggsave(filename = "../../figures/plots/exp5_alter_knowledge.pdf",
+       width = 8,
+       height = 4)
+```
 
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
