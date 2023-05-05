@@ -9,6 +9,7 @@ output: html_document
 ```{r}
 library(dplyr)
 library(ggplot2)
+library(ggthemes)
 library(tidyr)
 library(AICcmodavg)
 library(broom.mixed)
@@ -60,7 +61,7 @@ df.ex1_pilot.prolific_ids <- read_csv("../../data/experiment_1/pilot/ego_ignoran
 #merge bonuses with prolific ids
 df.ex1_pilot.rewards = df.ex1_pilot.rewards %>% 
   select(workerid, bonus) %>% 
-  inner_join(df.ex1.prolific_ids) %>% 
+  inner_join(df.ex1_pilot.prolific_ids) %>% 
   select(-workerid) %>% 
   relocate(prolific_participant_id) %>% 
   mutate(
@@ -95,6 +96,18 @@ df.ex1.rewards = df.ex1.participants %>%
 write.table(df.ex1.rewards, "../../data/experiment_1/experiment_1-bonuses.txt", sep = ",", col.names = FALSE, row.names = FALSE, quote=FALSE)
 
 ```
+##Get Demographics
+```{r}
+#get demos
+df.ex1.demos <- read_csv("../../data/experiment_1/ego_ignorance_thesis-participants.csv") 
+
+ex1.demos.gender <- df.ex1.demos %>% 
+  count(gender)
+ex1.demos.gender
+ex1.mean_age <- mean(df.ex1.demos$age)
+ex1.mean_age
+```
+
 
 ##Figures
 
@@ -339,9 +352,15 @@ summary(aov)
 #take cases when participant can't see ball and can or can't infer it's position. Is participant more likely to select a position if the character can see it? 
 #Is this only the case when the participant can't infer the ball's location?
 #correct for baseline proportion of cases which are alter_occluded
+
+
 alter_ig_data <- df.ex1.trials %>% 
   filter(
     !ego_ball_visible
+  ) %>% 
+  mutate(
+    ego_can_infer = case_when(ego_can_infer~'Knowledge', TRUE~'Ignorance'),
+    response_alter_occluded = case_when(response_alter_occluded~"Occluded", TRUE~'Visible')
   ) %>% 
   group_by(ego_can_infer, response_alter_occluded) %>% 
   summarize(
@@ -358,8 +377,8 @@ corrected_alter_ig_data <- alter_ig_data %>%
   inner_join(alter_ig_data) %>% 
   mutate(
     corrected_responses = case_when(
-      response_alter_occluded ~ responses / proportion_alt_occluded,
-      response_alter_occluded == FALSE ~ responses / proportion_not_occluded
+      response_alter_occluded=='Occluded' ~ responses / proportion_alt_occluded,
+      response_alter_occluded == 'Visible' ~ responses / proportion_not_occluded
     )
   )
 
@@ -372,9 +391,18 @@ fig1 <- ggplot(
   ) +
   geom_col(
     position = 'dodge'
-  )
+  ) +
+  xlab('Participant Knowledge State') +
+  ylab('Corrected Responses') +
+  scale_fill_discrete(name = "Character's Perspective") +
+  theme_economist_white() +
+  theme(axis.title.x = element_text(margin = unit(c(0.2,0,0,0), 'cm')), axis.title.y = element_text(margin = unit(c(0,0.2,0,0), 'cm')))
 
 fig1
+
+ggsave(filename = "../../figures/plots/alter_knowledge_pilot.pdf",
+       width = 5,
+       height = 4)
 
 ```
 
@@ -595,11 +623,19 @@ df.ex1.glm.0 <- df.ex1.trials %>%
     !ego_ball_visible
   )
 
-glm.0 <- glm(
+glm.0 <- glmer(
   formula = response_alter_occluded ~ ego_can_infer + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
-  data = df.ex1.glm.0)
+  data = df.ex1.glm.0,
+  family = 'binomial')
 
-tidy(glm.0)
+glm.1 <- glm(
+  formula = response_alter_occluded ~ 1 + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = df.ex1.glm.0,
+  family = 'binomial')
+
+aov.1 <- anova(glm.0, glm.1)
+aov.1
+
 ```
 
 
@@ -675,6 +711,19 @@ write.table(df.control.rewards, "../../data/experiment_control/control-bonuses.t
 
 sum(df.control.rewards$bonus)
 ```
+
+##Get Demographics
+```{r}
+#get demos
+df.control.demos <- read_csv("../../data/experiment_control/ego_ignorance_thesis_control-participants.csv") 
+
+control.demos.gender <- df.control.demos %>% 
+  count(gender)
+control.demos.gender
+control.mean_age <- mean(df.control.demos$age, na.rm=TRUE)
+control.mean_age
+```
+
 ##Figures
 
 ###Make right choice when there is one?
@@ -707,6 +756,10 @@ alter_ig_control_data <- df.control.trials %>%
   filter(
     !ego_ball_visible
   ) %>% 
+  mutate(
+    ego_can_infer = case_when(ego_can_infer~'Knowledge', TRUE~'Ignorance'),
+    response_alter_occluded = case_when(response_alter_occluded~"Occluded", TRUE~'Visible')
+  ) %>% 
   count(ego_can_infer, response_alter_occluded)
 
 baseline_alter_occluded <- df.control.trials %>% 
@@ -721,14 +774,20 @@ fig1 <- ggplot(
   ) +
   geom_col(
     position='dodge'
-  )
+  ) +
+  xlab('Participant Knowledge State') +
+  ylab('Responses') +
+  scale_fill_discrete(name = "Character's Perspective") +
+  theme_economist_white() +
+  theme(axis.title.x = element_text(margin = unit(c(0.2,0,0,0), 'cm')), axis.title.y = element_text(margin = unit(c(0,0.2,0,0), 'cm')))
 
 fig1
 
-ggsave(filename = "../../figures/plots/control_alter_knowledge.pdf",
-       width = 8,
+ggsave(filename = "../../figures/plots/alter_knowledge_no_character.pdf",
+       width = 5,
        height = 4)
 ```
+
 ###Interest in Alter Knowledge from index
 
 ```{r}
@@ -804,11 +863,19 @@ control_alter_ig_data <- df.control.trials %>%
     !ego_ball_visible
   )
 
-glm.1 <- glm(
+glm.2 <- glmer(
   formula = response_alter_occluded ~ ego_can_infer + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
-  data = control_alter_ig_data)
+  data = control_alter_ig_data,
+  family = 'binomial')
 
-tidy(glm.1)
+glm.3 <- glmer(
+  formula = response_alter_occluded ~ 1 + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = control_alter_ig_data,
+  family = 'binomial')
+
+aov.1 <- anova(glm.2, glm.3)
+
+aov.1
 ```
 #EXPERIMENT 2
 
@@ -861,6 +928,18 @@ write.table(df.ex2.rewards, "../../data/experiment_2/ex2-bonuses.txt", sep = ","
 mean(df.ex2.rewards$bonus)
 ```
 
+##Get Demographics
+```{r}
+#get demos
+df.ex2.demos <- read_csv("../../data/experiment_2/ego_ignorance_thesis_experiment_2-participants.csv") 
+
+ex2.demos.gender <- df.ex2.demos %>% 
+  count(gender)
+ex2.demos.gender
+ex2.mean_age <- mean(df.ex2.demos$age)
+ex2.mean_age
+```
+
 ##Figures
 
 ###Interest in Alter Knowledge
@@ -868,6 +947,10 @@ mean(df.ex2.rewards$bonus)
 alter_ig_ex2_data <- df.ex2.trials %>% 
   filter(
     !ego_ball_visible
+  ) %>% 
+  mutate(
+    ego_can_infer = case_when(ego_can_infer~'Knowledge', TRUE~'Ignorance'),
+    response_alter_occluded = case_when(response_alter_occluded~"Occluded", TRUE~'Visible')
   ) %>% 
   count(ego_can_infer, response_alter_occluded)
 
@@ -880,12 +963,18 @@ fig1 <- ggplot(
   ) +
   geom_col(
     position='dodge'
-  )
+  ) +
+  xlab('Participant Knowledge State') +
+  ylab('Responses') +
+  scale_fill_discrete(name = "Character's Perspective") +
+  theme_economist_white() +
+  theme(axis.title.x = element_text(margin = unit(c(0.2,0,0,0), 'cm')), axis.title.y = element_text(margin = unit(c(0,0.2,0,0), 'cm')))
 
 fig1
 
-ggsave(filename = "../../figures/plots/exp2_alter_knowledge.pdf",
-       width = 8,
+
+ggsave(filename = "../../figures/plots/alter_knowledge_character.pdf",
+       width = 5,
        height = 4)
 ```
 
@@ -1191,17 +1280,17 @@ ex2_alter_ig_data <- df.ex2.trials %>%
     !ego_ball_visible
   )
 
-glm.2 <- glmer(
+glm.4 <- glmer(
   formula = response_alter_occluded ~ ego_can_infer + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
   data = ex2_alter_ig_data,
   family = 'binomial')
 
-glm.3 <- glmer(
+glm.5 <- glmer(
   formula = response_alter_occluded ~ 1 + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
   data = ex2_alter_ig_data,
   family = 'binomial')
 
-aov.1 <- anova(glm.2, glm.3)
+aov.1 <- anova(glm.4, glm.5)
 
 aov.1
 ```
@@ -1257,7 +1346,7 @@ df.ex3.trials <- df.ex3.trials %>%
     response_ball_position = (response==ball_pos))
 ```
 
-##Calculate Control Bonus info
+##Calculate Bonus info
 ```{r}
 df.ex3.rewards <- read_csv("../../data/experiment_3/ego_ignorance_thesis_experiment_3-participants.csv")
 df.ex3.prolific_ids <- read_csv("../../data/experiment_3/ego_ignorance_thesis_experiment_3-workerids.csv")
@@ -1280,6 +1369,18 @@ write.table(df.ex3.rewards, "../../data/experiment_3/ex3-bonuses.txt", sep = ","
 mean(df.ex3.rewards$bonus)
 ```
 
+##Get Demographics
+```{r}
+#get demos
+df.ex3.demos <- read_csv("../../data/experiment_3/ego_ignorance_thesis_experiment_3-participants.csv") 
+
+ex3.demos.gender <- df.ex3.demos %>% 
+  count(gender)
+ex3.demos.gender
+ex3.mean_age <- mean(df.ex3.demos$age)
+ex3.mean_age
+```
+
 ##Figures
 
 ###Interest in Alter Knowledge
@@ -1287,6 +1388,10 @@ mean(df.ex3.rewards$bonus)
 alter_ig_ex3_data <- df.ex3.trials %>% 
   filter(
     !ego_ball_visible
+  ) %>% 
+  mutate(
+    ego_can_infer = case_when(ego_can_infer~'Knowledge', TRUE~'Ignorance'),
+    response_alter_occluded = case_when(response_alter_occluded~"Occluded", TRUE~'Visible')
   ) %>% 
   count(ego_can_infer, response_alter_occluded)
 
@@ -1299,12 +1404,17 @@ fig1 <- ggplot(
   ) +
   geom_col(
     position='dodge'
-  )
+  ) +
+  xlab('Participant Knowledge State') +
+  ylab('Responses') +
+  scale_fill_discrete(name = "Character's Perspective") +
+  theme_economist_white() +
+  theme(axis.title.x = element_text(margin = unit(c(0.2,0,0,0), 'cm')), axis.title.y = element_text(margin = unit(c(0,0.2,0,0), 'cm')))
 
 fig1
 
-ggsave(filename = "../../figures/plots/exp3_alter_knowledge.pdf",
-       width = 8,
+ggsave(filename = "../../figures/plots/alter_knowledge_lamp.pdf",
+       width = 5,
        height = 4)
 ```
 
@@ -1415,17 +1525,17 @@ ex3_alter_ig_data <- df.ex3.trials %>%
     !ego_ball_visible
   )
 
-glm.4 <- glmer(
+glm.6 <- glmer(
   formula = response_alter_occluded ~ ego_can_infer + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
   data = ex3_alter_ig_data,
   family = 'binomial')
 
-glm.5 <- glmer(
+glm.7 <- glmer(
   formula = response_alter_occluded ~ 1 + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
   data = ex3_alter_ig_data,
   family = 'binomial')
 
-aov.2 <- anova(glm.4, glm.5)
+aov.2 <- anova(glm.6, glm.7)
 
 aov.2
 ```
@@ -1483,6 +1593,19 @@ write.table(df.ex4.rewards, "../../data/experiment_4/ex4-bonuses.txt", sep = ","
 
 mean(df.ex4.rewards$bonus)
 ```
+
+##Get Demographics
+```{r}
+#get demos
+df.ex4.demos <- read_csv("../../data/experiment_4/ego_ignorance_thesis_experiment_4-participants.csv") 
+
+ex4.demos.gender <- df.ex4.demos %>% 
+  count(gender)
+ex4.demos.gender
+ex4.mean_age <- mean(df.ex4.demos$age)
+ex4.mean_age
+```
+
 ##Figures
 
 ###Interest in Alter Knowledge
@@ -1490,6 +1613,10 @@ mean(df.ex4.rewards$bonus)
 alter_ig_ex4_data <- df.ex4.trials %>% 
   filter(
     key_trial | trick_trial
+  ) %>% 
+  mutate(
+    ego_can_infer = case_when(ego_can_infer~'Knowledge', TRUE~'Ignorance'),
+    response_alter_occluded = case_when(response_alter_occluded~"Occluded", TRUE~'Visible')
   ) %>% 
   count(trial_type, response_alter_occluded)
 
@@ -1502,9 +1629,18 @@ fig1 <- ggplot(
   ) +
   geom_col(
     position='dodge'
-  )
+  ) +
+  xlab('Participant Knowledge State') +
+  ylab('Responses') +
+  scale_fill_discrete(name = "Character's Perspective") +
+  theme_economist_white() +
+  theme(axis.title.x = element_text(margin = unit(c(0.2,0,0,0), 'cm')), axis.title.y = element_text(margin = unit(c(0,0.2,0,0), 'cm')))
 
 fig1
+
+ggsave(filename = "../../figures/plots/alter_knowledge_trick.pdf",
+       width = 5,
+       height = 4)
 ```
 ###Examine Filler Trials
 ```{r}
@@ -1699,6 +1835,18 @@ write.table(df.ex5.rewards, "../../data/experiment_5/ex5-bonuses.txt", sep = ","
 mean(df.ex5.rewards$bonus)
 ```
 
+##Get Demographics
+```{r}
+#get demos
+df.ex5.demos <- read_csv("../../data/experiment_5/ego_ignorance_thesis_experiment_5-participants.csv") 
+
+ex5.demos.gender <- df.ex5.demos %>% 
+  count(gender)
+ex5.demos.gender
+ex5.mean_age <- mean(df.ex5.demos$age)
+ex5.mean_age
+```
+
 ##Figures
 
 ###Interest in Alter Knowledge
@@ -1706,6 +1854,10 @@ mean(df.ex5.rewards$bonus)
 alter_ig_ex5_data <- df.ex5.trials %>% 
   filter(
     !ego_ball_visible
+  ) %>% 
+  mutate(
+    ego_can_infer = case_when(ego_can_infer~'Knowledge', TRUE~'Ignorance'),
+    response_alter_occluded = case_when(response_alter_occluded~"Occluded", TRUE~'Visible')
   ) %>% 
   count(ego_can_infer, response_alter_occluded)
 
@@ -1718,13 +1870,124 @@ fig1 <- ggplot(
   ) +
   geom_col(
     position='dodge'
-  )
+  ) +
+  xlab('Participant Knowledge State') +
+  ylab('Responses') +
+  scale_fill_discrete(name = "Character's Perspective") +
+  theme_economist_white() +
+  theme(axis.title.x = element_text(margin = unit(c(0.2,0,0,0), 'cm')), axis.title.y = element_text(margin = unit(c(0,0.2,0,0), 'cm')))
+
+
+
 
 fig1
 
-ggsave(filename = "../../figures/plots/exp5_alter_knowledge.pdf",
-       width = 8,
+ggsave(filename = "../../figures/plots/alter_knowledge_character_control.pdf",
+       width = 5,
        height = 4)
+```
+
+##Analyses
+
+###Interest in alter knowledge from responses (GLM)
+```{r}
+
+ex5_alter_ig_data <- df.ex5.trials %>% 
+  filter(
+    !ego_ball_visible
+  )
+
+glm.10 <- glmer(
+  formula = response_alter_occluded ~ ego_can_infer + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = ex5_alter_ig_data,
+  family = 'binomial')
+
+glm.11 <- glmer(
+  formula = response_alter_occluded ~ 1 + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = ex5_alter_ig_data,
+  family = 'binomial')
+
+aov.5 <- anova(glm.10, glm.11)
+
+aov.5
+```
+
+# COMBINED FIGURES/ANALYSES
+
+##'Correct' Choices?
+```{r}
+
+#overall df
+combined_data <- df.ex1.trials %>% 
+  rbind(df.control.trials, df.ex2.trials, df.ex3.trials, df.ex5.trials) %>% 
+  mutate(
+    Experiment = case_when(
+      proliferate.condition=="Experiment 1" ~ 'Pilot',
+     proliferate.condition== 'Pilot (test data collection)' ~ 'Pilot',
+      proliferate.condition=="Experiment 2" ~ 'Experiment 1',
+      proliferate.condition=="Experiment 3" ~ 'Experimen 3',
+      proliferate.condition=="Experiment 5" ~ 'Experiment 4',
+      proliferate.condition=="Control" ~ 'Experiment 2'
+    ),
+    Experiment = factor(Experiment, levels = c('Pilot', 'Experiment 1', 'Experiment 2', 'Experimen 3', 'Experiment 4'))
+  )
+
+#RATIONAL CHOICE ACCURACY
+combined_accuracy_data <- combined_data %>%
+  filter(collective_can_infer) %>% 
+  count(accuracy, Experiment, workerid) %>% 
+  rename(Responses = n) %>% 
+  mutate(accuracy = case_when(accuracy ~ 'correct', TRUE ~ 'incorrect')) %>% 
+  pivot_wider(names_from = accuracy, values_from = Responses) %>% 
+  mutate(Accuracy = correct / (correct + incorrect)) %>% 
+  group_by(Experiment) %>% 
+  summarise(mean = mean(Accuracy, na.rm=TRUE), sd = sd(Accuracy, na.rm=TRUE))
+combined_accuracy_data
+
+#OVERALL ACCURACY
+combined_accuracy_data_overall <- combined_data %>% 
+  count(accuracy, Experiment, workerid) %>% 
+  rename(Responses = n) %>% 
+  mutate(accuracy = case_when(accuracy ~ 'correct', TRUE ~ 'incorrect')) %>% 
+  pivot_wider(names_from = accuracy, values_from = Responses) %>% 
+  mutate(Accuracy = correct / (correct + incorrect)) %>% 
+  group_by(Experiment) %>% 
+  summarise(mean = mean(Accuracy, na.rm=TRUE), sd = sd(Accuracy, na.rm=TRUE))
+combined_accuracy_data_overall
+
+median_rt <- median(combined_data$rt)
+
+```
+
+##PREF TO SELECT BALL?
+```{r}
+
+
+fig1 <- ggplot(
+  data = combined_select_ball,
+  mapping = aes(
+    x = response_ball_position,
+    y = responses,
+    fill = response_ball_position)
+  ) +
+  geom_col(
+    position = 'dodge'
+  ) +
+  facet_grid(~Experiment) +
+  xlab("Selected Ball's Position?")+ 
+  ylab("Responses") +
+  theme(legend.position='none', axis.title.x = element_text(margin = unit(c(0.2,0,0,0), 'cm')), axis.title.y = element_text(margin = unit(c(0,0.2,0,0), 'cm')))
+
+
+fig1
+
+  
+ggsave(filename = "../../figures/plots/preference_select_ball.pdf",
+       width = 5,
+       height = 4)
+
+```
+
 ```
 
 
