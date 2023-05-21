@@ -15,6 +15,7 @@ library(AICcmodavg)
 library(broom.mixed)
 library(nnet)
 library(lme4)
+library(emmeans)
 library(effectsize)
 library(pwr)
 library(tidyverse)
@@ -110,6 +111,104 @@ ex1.mean_age
 
 
 ##Figures
+
+###Interest in Alter Knowledge (violin)
+```{r}
+
+alter_ig_data_ex1_occluders <- df.ex1.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  mutate(
+    ego_can_infer = case_when(ego_can_infer~'Knowledge', TRUE~'Ignorance'),
+    response_alter_occluded = case_when(response_alter_occluded~"Occluded", TRUE~'Visible'),
+    num_alter_visible = 3 - num_alter_occluders
+  ) %>% 
+  group_by(ego_can_infer, workerid) %>% 
+  summarize(
+    total_alt_occluded = sum(num_alter_occluders),
+    total_not_occluded = sum(num_alter_visible)
+    ) 
+
+alter_ig_data_ex1 <- df.ex1.trials %>%
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  mutate(
+    ego_can_infer = case_when(ego_can_infer~'Knowledge', TRUE~'Ignorance'),
+    response_alter_occluded = case_when(response_alter_occluded~"Occluded", TRUE~'Visible'),
+  ) %>% 
+  group_by(ego_can_infer, response_alter_occluded, workerid) %>% 
+  summarize(
+    responses = n()
+  ) %>% 
+  inner_join(alter_ig_data_ex1_occluders) %>% 
+  mutate(
+    proportional_responses = case_when(
+      response_alter_occluded == 'Occluded' ~ responses / total_alt_occluded,
+      response_alter_occluded == 'Visible' ~ responses / total_not_occluded
+    )
+  )
+
+
+
+#calculate means 
+ex1_fig_means <- alter_ig_data_ex1  %>% 
+  group_by(ego_can_infer, response_alter_occluded) %>% 
+  dplyr::summarize(mean = mean(proportional_responses))
+
+
+fig0 <- ggplot(
+  data = alter_ig_data_ex1,
+  mapping = aes(
+    x = response_alter_occluded,
+    y = proportional_responses,
+    color = response_alter_occluded)
+  ) +
+  geom_point(
+    position = position_jitterdodge(dodge.width = 0.9, jitter.width = 0.2),
+    size = 0.9,
+    alpha = 1) +
+  geom_violin(
+    aes(alpha = 0),
+    position = position_dodge(width=0.9)) +
+  geom_boxplot(
+    aes(alpha = 0),
+    outlier.shape = NA,
+    width = 0.15,
+    position = position_dodge(width=0.9),
+    fatten = NULL) +
+  geom_line(
+    data = ex1_fig_means,
+    mapping = aes(x = response_alter_occluded, 
+      y = mean, 
+      group=ego_can_infer),
+    color="grey30"
+    ) +
+  geom_point(
+    data = ex1_fig_means, 
+    mapping = aes(x = response_alter_occluded, 
+      y = mean, 
+      group=response_alter_occluded),
+    position = position_dodge(width=0.9)
+  ) + 
+  facet_grid(~ego_can_infer) +
+  xlab(element_blank()) +
+  ylab("Percentage Responses") +
+  theme_minimal() +
+  scale_colour_ptol() +
+  theme(
+    legend.position = "none",
+    strip.text.x = element_text(size = 14),
+    axis.title = element_text(size = 14, margin = unit(c(0,0.2,0,0), 'cm')),
+    axis.text = element_text(size = 12),)
+
+ggsave(filename = "../../figures/plots/alter_knowledge_pilot_violin.pdf",
+       width = 5,
+       height = 4)
+
+fig0
+```
 
 ###Make right choice when there is one?
 ```{r}
@@ -615,6 +714,7 @@ aov.1 <- aov(probability_response_alter_occluded ~ ego_can_infer + workerid, dat
 summary(aov.1)
 
 ```
+
 ###Interest in alter knowledge (GLM)
 ```{r}
 
@@ -628,14 +728,35 @@ glm.0 <- glmer(
   data = df.ex1.glm.0,
   family = 'binomial')
 
-glm.1 <- glm(
+glm.1 <- glmer(
   formula = response_alter_occluded ~ 1 + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
   data = df.ex1.glm.0,
   family = 'binomial')
 
 aov.1 <- anova(glm.0, glm.1)
 aov.1
+```
 
+
+####Pairwise follow-up
+```{r}
+#get participant level summary
+df.ex1.lm <- df.ex1.trials %>% 
+  filter(
+    !ego_can_infer
+  ) %>% 
+  group_by(response_alter_occluded, workerid) %>% 
+  summarize(responses = n())
+
+lm.1 <- lmer(
+  formula = responses ~ response_alter_occluded + (1|workerid),  
+  data = df.ex1.lm )
+
+lm.2 <- lmer(
+  formula = responses ~ 1 + (1|workerid),  
+  data = df.ex1.lm )
+
+anova(lm.1, lm.2)
 ```
 
 
@@ -788,6 +909,89 @@ ggsave(filename = "../../figures/plots/alter_knowledge_no_character.pdf",
        height = 4)
 ```
 
+###Interest in Alter Knowledge (violin)
+```{r}
+#get participant level summary (showing total responses)
+alter_ig_control_data <- df.control.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  mutate(
+    ego_can_infer = case_when(ego_can_infer~'Knowledge', TRUE~'Ignorance'),
+    response_alter_occluded = case_when(response_alter_occluded~"Occluded", TRUE~'Visible')
+  ) %>% 
+  count(ego_can_infer, response_alter_occluded, workerid)
+
+#quickly get the number of total responses in each category
+control_total_responses <- alter_ig_control_data %>% 
+  group_by(workerid, ego_can_infer) %>% 
+  mutate(total_responses = sum(n))
+
+#convert responses to percentages
+alter_ig_control_data <- alter_ig_control_data %>% 
+  inner_join(control_total_responses) %>% 
+  mutate(percentage = (n / total_responses)*100)
+
+#calculate means 
+control_fig_means <- alter_ig_control_data %>% 
+  group_by(ego_can_infer, response_alter_occluded) %>% 
+  dplyr::summarize(mean = mean(percentage))
+
+#make plot
+fig1 <- ggplot(
+  data = alter_ig_control_data,
+  mapping = aes(
+    x = response_alter_occluded,
+    y = percentage,
+    color = response_alter_occluded)
+  ) +
+  geom_point(
+    position = position_jitterdodge(dodge.width = 0.9, jitter.width = 0.2),
+    size = 0.9,
+    alpha = 1) +
+  geom_violin(
+    aes(alpha = 0),
+    position = position_dodge(width=0.9)) +
+  geom_boxplot(
+    aes(alpha = 0),
+    outlier.shape = NA,
+    width = 0.15,
+    position = position_dodge(width=0.9),
+    fatten = NULL) +
+  geom_line(
+    data = control_fig_means,
+    mapping = aes(x = response_alter_occluded, 
+      y = mean, 
+      group=ego_can_infer),
+    color="grey30"
+    ) +
+  geom_point(
+    data = control_fig_means, 
+    mapping = aes(x = response_alter_occluded, 
+      y = mean, 
+      group=response_alter_occluded),
+    position = position_dodge(width=0.9)
+  ) + 
+  facet_grid(~ego_can_infer) +
+  xlab(element_blank()) +
+  ylab("Participant Responses (percent)") +
+  ylim(0, 100) +
+  theme_minimal() +
+  scale_colour_ptol() +
+  theme(
+    legend.position = "none",
+    strip.text.x = element_text(size = 14),
+    axis.title = element_text(size = 14, margin = unit(c(0,0.2,0,0), 'cm')),
+    axis.text = element_text(size = 12),) 
+
+ggsave(filename = "../../figures/plots/alter_knowledge_no_character_violin.pdf",
+       width = 5,
+       height = 4)
+
+fig1
+
+```
+
 ###Interest in Alter Knowledge from index
 
 ```{r}
@@ -877,6 +1081,28 @@ aov.1 <- anova(glm.2, glm.3)
 
 aov.1
 ```
+
+####Pairwise follow-up
+```{r}
+#get participant level summary
+df.control.lm <- df.control.trials %>% 
+  filter(
+    !ego_can_infer
+  ) %>% 
+  group_by(response_alter_occluded, workerid) %>% 
+  summarize(responses = n())
+
+lm.3 <- lmer(
+  formula = responses ~ response_alter_occluded + (1|workerid),  
+  data = df.control.lm )
+
+lm.4 <- lmer(
+  formula = responses ~ 1 + (1|workerid),  
+  data = df.control.lm )
+
+anova(lm.3, lm.4)
+```
+
 #EXPERIMENT 2
 
 ##Load Data
@@ -976,6 +1202,86 @@ fig1
 ggsave(filename = "../../figures/plots/alter_knowledge_character.pdf",
        width = 5,
        height = 4)
+```
+
+###Interest in Alter Knowledge (violin)
+```{r}
+alter_ig_ex2_data <- df.ex2.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  mutate(
+    ego_can_infer = case_when(ego_can_infer~'Knowledge', TRUE~'Ignorance'),
+    response_alter_occluded = case_when(response_alter_occluded~"Occluded", TRUE~'Visible')
+  ) %>% 
+  count(ego_can_infer, response_alter_occluded, workerid)
+
+#quickly get the number of total responses in each category
+ex2_total_responses <- alter_ig_ex2_data %>% 
+  group_by(workerid, ego_can_infer) %>% 
+  mutate(total_responses = sum(n))
+
+#convert responses to percentages
+alter_ig_ex2_data <- alter_ig_ex2_data %>% 
+  inner_join(ex2_total_responses) %>% 
+  mutate(percentage = (n / total_responses)*100)
+
+#calculate means 
+ex2_fig_means <- alter_ig_ex2_data %>% 
+  group_by(ego_can_infer, response_alter_occluded) %>% 
+  dplyr::summarize(mean = mean(percentage))
+
+fig1 <- ggplot(
+  data = alter_ig_ex2_data,
+  mapping = aes(
+    x = response_alter_occluded,
+    y = percentage,
+    color = response_alter_occluded)
+  ) +
+  geom_point(
+    position = position_jitterdodge(dodge.width = 0.9, jitter.width = 0.2),
+    size = 0.9,
+    alpha = 1) +
+  geom_violin(
+    aes(alpha = 0),
+    position = position_dodge(width=0.9)) +
+  geom_boxplot(
+    aes(alpha = 0),
+    outlier.shape = NA,
+    width = 0.15,
+    position = position_dodge(width=0.9),
+    fatten = NULL) +
+  geom_line(
+    data = ex2_fig_means,
+    mapping = aes(x = response_alter_occluded, 
+      y = mean, 
+      group=ego_can_infer),
+    color="grey30"
+    ) +
+  geom_point(
+    data = ex2_fig_means, 
+    mapping = aes(x = response_alter_occluded, 
+      y = mean, 
+      group=response_alter_occluded),
+    position = position_dodge(width=0.9)
+  ) + 
+  facet_grid(~ego_can_infer) +
+  xlab(element_blank()) +
+  ylab("Participant Responses (percent)") +
+  ylim(0, 100) +
+  theme_minimal() +
+  scale_colour_ptol() +
+  theme(
+    legend.position = "none",
+    strip.text.x = element_text(size = 14),
+    axis.title = element_text(size = 14, margin = unit(c(0,0.2,0,0), 'cm')),
+    axis.text = element_text(size = 12),)
+
+ggsave(filename = "../../figures/plots/alter_knowledge_character_violin.pdf",
+       width = 5,
+       height = 4)
+
+fig1
 ```
 
 ###Interest in Alter Knowledge in complete ego_ignorance
@@ -1294,6 +1600,26 @@ aov.1 <- anova(glm.4, glm.5)
 
 aov.1
 ```
+####Pairwise follow-up
+```{r}
+#get participant level summary
+df.ex2.lm <- df.ex2.trials %>% 
+  filter(
+    !ego_can_infer
+  ) %>% 
+  group_by(response_alter_occluded, workerid) %>% 
+  summarize(responses = n())
+
+lm.5 <- lmer(
+  formula = responses ~ response_alter_occluded + (1|workerid),  
+  data = df.ex2.lm )
+
+lm.6 <- lmer(
+  formula = responses ~ 1 + (1|workerid),  
+  data = df.ex2.lm )
+
+anova(lm.5, lm.6)
+```
 
 ###Interest in alter knowledge from rt (GLM)
 
@@ -1418,6 +1744,87 @@ ggsave(filename = "../../figures/plots/alter_knowledge_lamp.pdf",
        height = 4)
 ```
 
+###Interest in Alter Knowledge (violin)
+```{r}
+alter_ig_ex3_data <- df.ex3.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  mutate(
+    ego_can_infer = case_when(ego_can_infer~'Knowledge', TRUE~'Ignorance'),
+    response_alter_occluded = case_when(response_alter_occluded~"Occluded", TRUE~'Visible')
+  ) %>% 
+  count(ego_can_infer, response_alter_occluded, workerid)
+
+#quickly get the number of total responses in each category
+ex3_total_responses <- alter_ig_ex3_data %>% 
+  group_by(workerid, ego_can_infer) %>% 
+  mutate(total_responses = sum(n))
+
+#convert responses to percentages
+alter_ig_ex3_data <- alter_ig_ex3_data %>% 
+  inner_join(ex3_total_responses) %>% 
+  mutate(percentage = (n / total_responses)*100)
+
+#calculate means 
+ex3_fig_means <- alter_ig_ex3_data %>% 
+  group_by(ego_can_infer, response_alter_occluded) %>% 
+  dplyr::summarize(mean = mean(percentage))
+
+fig1 <- ggplot(
+  data = alter_ig_ex3_data,
+  mapping = aes(
+    x = response_alter_occluded,
+    y = percentage,
+    color = response_alter_occluded)
+  ) +
+  geom_point(
+    position = position_jitterdodge(dodge.width = 0.9, jitter.width = 0.2),
+    size = 0.9,
+    alpha = 1) +
+  geom_violin(
+    aes(alpha = 0),
+    position = position_dodge(width=0.9)) +
+  geom_boxplot(
+    aes(alpha = 0),
+    outlier.shape = NA,
+    width = 0.15,
+    position = position_dodge(width=0.9),
+    fatten = NULL) +
+  geom_line(
+    data = ex3_fig_means,
+    mapping = aes(x = response_alter_occluded, 
+      y = mean, 
+      group=ego_can_infer),
+    color="grey30"
+    ) +
+  geom_point(
+    data = ex3_fig_means, 
+    mapping = aes(x = response_alter_occluded, 
+      y = mean, 
+      group=response_alter_occluded),
+    position = position_dodge(width=0.9)
+  ) + 
+  facet_grid(~ego_can_infer) +
+  xlab(element_blank()) +
+  ylab("Participant Responses (percent)") +
+  ylim(0,100) +
+  theme_minimal() +
+  scale_colour_ptol() +
+  theme(
+    legend.position = "none",
+    strip.text.x = element_text(size = 14),
+    axis.title = element_text(size = 14, margin = unit(c(0,0.2,0,0), 'cm')),
+    axis.text = element_text(size = 12),)
+
+ggsave(filename = "../../figures/plots/alter_knowledge_lamp_violin.pdf",
+       width = 5,
+       height = 4)
+
+fig1
+```
+
+
 ###Interest in Alter Knowledge (split by alter_can_infer)
 ```{r}
 alter_ig_ex3_data <- df.ex3.trials %>% 
@@ -1538,6 +1945,27 @@ glm.7 <- glmer(
 aov.2 <- anova(glm.6, glm.7)
 
 aov.2
+```
+
+####Pairwise follow-up
+```{r}
+#get participant level summary
+df.ex3.lm <- df.ex3.trials %>% 
+  filter(
+    !ego_can_infer
+  ) %>% 
+  group_by(response_alter_occluded, workerid) %>% 
+  summarize(responses = n())
+
+lm.7 <- lmer(
+  formula = responses ~ response_alter_occluded + (1|workerid),  
+  data = df.ex3.lm )
+
+lm.8 <- lmer(
+  formula = responses ~ 1 + (1|workerid),  
+  data = df.ex3.lm )
+
+anova(lm.7, lm.8)
 ```
 
 #EXPERIMENT 4
@@ -1887,6 +2315,87 @@ ggsave(filename = "../../figures/plots/alter_knowledge_character_control.pdf",
        height = 4)
 ```
 
+###Interest in Alter Knowledge (violin)
+```{r}
+alter_ig_ex5_data <- df.ex5.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  mutate(
+    ego_can_infer = case_when(ego_can_infer~'Knowledge', TRUE~'Ignorance'),
+    response_alter_occluded = case_when(response_alter_occluded~"Occluded", TRUE~'Visible')
+  ) %>% 
+  count(ego_can_infer, response_alter_occluded, workerid)
+
+#quickly get the number of total responses in each category
+ex5_total_responses <- alter_ig_ex5_data %>% 
+  group_by(workerid, ego_can_infer) %>% 
+  mutate(total_responses = sum(n))
+
+#convert responses to percentages
+alter_ig_ex5_data <- alter_ig_ex5_data %>% 
+  inner_join(ex5_total_responses) %>% 
+  mutate(percentage = (n / total_responses)*100)
+
+#calculate means 
+ex5_fig_means <- alter_ig_ex5_data %>% 
+  group_by(ego_can_infer, response_alter_occluded) %>% 
+  dplyr::summarize(mean = mean(percentage))
+
+
+fig1 <- ggplot(
+  data = alter_ig_ex5_data,
+  mapping = aes(
+    x = response_alter_occluded,
+    y = percentage,
+    color = response_alter_occluded)
+  ) +
+  geom_point(
+    position = position_jitterdodge(dodge.width = 0.9, jitter.width = 0.2),
+    size = 0.9,
+    alpha = 1) +
+  geom_violin(
+    aes(alpha = 0),
+    position = position_dodge(width=0.9)) +
+  geom_boxplot(
+    aes(alpha = 0),
+    outlier.shape = NA,
+    width = 0.15,
+    position = position_dodge(width=0.9),
+    fatten = NULL) +
+  geom_line(
+    data = ex5_fig_means,
+    mapping = aes(x = response_alter_occluded, 
+      y = mean, 
+      group=ego_can_infer),
+    color="grey30"
+    ) +
+  geom_point(
+    data = ex5_fig_means, 
+    mapping = aes(x = response_alter_occluded, 
+      y = mean, 
+      group=response_alter_occluded),
+    position = position_dodge(width=0.9)
+  ) + 
+  facet_grid(~ego_can_infer) +
+  xlab(element_blank()) +
+  ylab("Participant Responses (percent)") +
+  ylim(0, 100) +
+  theme_minimal() +
+  scale_colour_ptol() +
+  theme(
+    legend.position = "none",
+    strip.text.x = element_text(size = 14),
+    axis.title = element_text(size = 14, margin = unit(c(0,0.2,0,0), 'cm')),
+    axis.text = element_text(size = 12))
+
+ggsave(filename = "../../figures/plots/alter_knowledge_character_control_violin.pdf",
+       width = 5,
+       height = 4)
+
+fig1
+```
+
 ##Analyses
 
 ###Interest in alter knowledge from responses (GLM)
@@ -1910,6 +2419,27 @@ glm.11 <- glmer(
 aov.5 <- anova(glm.10, glm.11)
 
 aov.5
+```
+
+####Pairwise follow-up
+```{r}
+#get participant level summary
+df.ex5.lm <- df.ex5.trials %>% 
+  filter(
+    !ego_can_infer
+  ) %>% 
+  group_by(response_alter_occluded, workerid) %>% 
+  summarize(responses = n())
+
+lm.9 <- lmer(
+  formula = responses ~ response_alter_occluded + (1|workerid),  
+  data = df.ex5.lm )
+
+lm.10 <- lmer(
+  formula = responses ~ 1 + (1|workerid),  
+  data = df.ex5.lm )
+
+anova(lm.9, lm.10)
 ```
 
 # COMBINED FIGURES/ANALYSES
@@ -1961,22 +2491,71 @@ median_rt <- median(combined_data$rt)
 
 ##PREF TO SELECT BALL?
 ```{r}
+combined_select_ball <- combined_data %>% 
+  filter(
+    Experiment == 'Pilot' | Experiment == "Experiment 1" &
+    ego_can_infer &
+    !alter_can_infer) %>% 
+  count(response_ball_position, Experiment, workerid) %>% 
+  mutate(responses = n)
 
+workerid_counts <- combined_select_ball %>% 
+  group_by(workerid) %>% 
+  summarize(total_trials = sum(responses))
+
+combined_select_ball <- combined_select_ball %>% 
+  inner_join(workerid_counts) %>% 
+  mutate(proportional_response = responses / total_trials)
+
+combined_select_ball_means <- combined_select_ball %>% 
+  group_by(Experiment, response_ball_position) %>% 
+  summarize(means = mean(proportional_response))
+  
 
 fig1 <- ggplot(
   data = combined_select_ball,
   mapping = aes(
     x = response_ball_position,
-    y = responses,
-    fill = response_ball_position)
+    y = proportional_response,
+    color = response_ball_position)
   ) +
-  geom_col(
-    position = 'dodge'
-  ) +
+  geom_point(
+    position = position_jitterdodge(dodge.width = 0.9, jitter.width = 0.2),
+    size = 0.9,
+    alpha = 1) +
+  geom_violin(
+    aes(alpha = 0),
+    position = position_dodge(width=0.9)) +
+  geom_boxplot(
+    aes(alpha = 0),
+    outlier.shape = NA,
+    width = 0.15,
+    position = position_dodge(width=0.9),
+    fatten = NULL) +
+  geom_line(
+    data = combined_select_ball_means,
+    mapping = aes(x = response_ball_position, 
+      y = means, 
+      group=Experiment),
+    color="grey30"
+    ) +
+  geom_point(
+    data = combined_select_ball_means, 
+    mapping = aes(x = response_ball_position, 
+      y = means, 
+      group=Experiment),
+    position = position_dodge(width=0.9)
+  ) + 
   facet_grid(~Experiment) +
   xlab("Selected Ball's Position?")+ 
-  ylab("Responses") +
-  theme(legend.position='none', axis.title.x = element_text(margin = unit(c(0.2,0,0,0), 'cm')), axis.title.y = element_text(margin = unit(c(0,0.2,0,0), 'cm')))
+  ylab("Percent Responses") +
+  theme_minimal() +
+  scale_colour_ptol() +
+  theme(
+    legend.position = "none",
+    strip.text.x = element_text(size = 14),
+    axis.title = element_text(size = 14, margin = unit(c(0,0.2,0,0), 'cm')),
+    axis.text = element_text(size = 12),)
 
 
 fig1
