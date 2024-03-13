@@ -10,6 +10,7 @@ output: html_document
 library(dplyr)
 library(ggplot2)
 library(ggthemes)
+library(gridExtra)
 library(tidyr)
 library(AICcmodavg)
 library(broom.mixed)
@@ -673,48 +674,6 @@ av.0 <- aov(rt ~ ego_ball_visible * response_ego_occluded, data = alter_ig_data)
 summary(av.0)
 ```
 
-### Interest in alter knowledge
-```{r}
-
-#Responses
-#df.glm.0 <- df.ex1.trials 
-
-#is the participant more likely to select a position that is alter occluded when they know where the ball is? aka 
-#are they more likely to select an !alter_occluded position when they don't know where the ball is 
-#glm.0 = glm(
-#  response_alter_occluded ~ ego_can_infer + num_alter_occluders,
-#  data = df.mult.0)
-
-
-#using participant level probabilities of selecting an alter occluded position
-alter_ig_data <- df.ex1.trials %>% 
-  filter(
-    !ego_ball_visible
-  ) %>% 
-  group_by(ego_can_infer, response_alter_occluded, workerid) %>% 
-  summarize(
-    responses = n(),
-    total_alt_occluded = sum(num_alter_occluders)
-  )
-
-
-corrected_alter_ig_data <- alter_ig_data %>% 
-  group_by(ego_can_infer, workerid) %>% 
-  summarize(
-    total_condition_alt_occluded = sum(total_alt_occluded)) %>% 
-  inner_join(alter_ig_data, by = c('ego_can_infer', 'workerid')) %>% 
-  filter(response_alter_occluded) %>% 
-  mutate(
-    probability_response_alter_occluded = responses / total_condition_alt_occluded
-  )
-
-#Are participants more likely to select alter occluded positions when they know where the ball is? (and therefore more likely to select alter-visible positions when they don't know where the ball is)
-#performed on participant x condition 'probability score' (total number of occluded or non-occluded positions corrected for the baseline freuency of occluded or non-occluded positions)
-aov.1 <- aov(probability_response_alter_occluded ~ ego_can_infer + workerid, data = corrected_alter_ig_data)
-summary(aov.1)
-
-```
-
 ###Interest in alter knowledge (GLM)
 ```{r}
 
@@ -763,6 +722,31 @@ anova(lm.1, lm.2)
 ####Post-hoc power analysis
 ```{r}
 
+#using participant level probabilities of selecting an alter occluded position
+alter_ig_data <- df.ex1.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  group_by(ego_can_infer, response_alter_occluded, workerid) %>% 
+  summarize(
+    responses = n(),
+    total_alt_occluded = sum(num_alter_occluders)
+  )
+
+corrected_alter_ig_data <- alter_ig_data %>% 
+  group_by(ego_can_infer, workerid) %>% 
+  summarize(
+    total_condition_alt_occluded = sum(total_alt_occluded)) %>% 
+  inner_join(alter_ig_data, by = c('ego_can_infer', 'workerid')) %>% 
+  filter(response_alter_occluded) %>% 
+  mutate(
+    probability_response_alter_occluded = responses / total_condition_alt_occluded
+  )
+
+#Are participants more likely to select alter occluded positions when they know where the ball is? (and therefore more likely to select alter-visible positions when they don't know where the ball is)
+#performed on participant x condition 'probability score' (total number of occluded or non-occluded positions corrected for the baseline freuency of occluded or non-occluded positions)
+aov.1 <- aov(probability_response_alter_occluded ~ ego_can_infer + workerid, data = corrected_alter_ig_data)
+summary(aov.1)
 #cohens-f = 0.27 for affect of ego_can_infer
 cohens_f(aov.1)
 
@@ -938,7 +922,7 @@ control_fig_means <- alter_ig_control_data %>%
   dplyr::summarize(mean = mean(percentage))
 
 #make plot
-fig1 <- ggplot(
+fig1_nochar <- ggplot(
   data = alter_ig_control_data,
   mapping = aes(
     x = response_alter_occluded,
@@ -1231,7 +1215,7 @@ ex2_fig_means <- alter_ig_ex2_data %>%
   group_by(ego_can_infer, response_alter_occluded) %>% 
   dplyr::summarize(mean = mean(percentage))
 
-fig1 <- ggplot(
+fig1_char <- ggplot(
   data = alter_ig_ex2_data,
   mapping = aes(
     x = response_alter_occluded,
@@ -1771,7 +1755,7 @@ ex3_fig_means <- alter_ig_ex3_data %>%
   group_by(ego_can_infer, response_alter_occluded) %>% 
   dplyr::summarize(mean = mean(percentage))
 
-fig1 <- ggplot(
+fig1_lamp <- ggplot(
   data = alter_ig_ex3_data,
   mapping = aes(
     x = response_alter_occluded,
@@ -2343,7 +2327,7 @@ ex5_fig_means <- alter_ig_ex5_data %>%
   dplyr::summarize(mean = mean(percentage))
 
 
-fig1 <- ggplot(
+fig1_controlchar <- ggplot(
   data = alter_ig_ex5_data,
   mapping = aes(
     x = response_alter_occluded,
@@ -2393,7 +2377,7 @@ ggsave(filename = "../../figures/plots/alter_knowledge_character_control_violin.
        width = 5,
        height = 4)
 
-fig1
+fig1_controlchar
 ```
 
 ##Analyses
@@ -2509,7 +2493,7 @@ combined_select_ball <- combined_select_ball %>%
 
 combined_select_ball_means <- combined_select_ball %>% 
   group_by(Experiment, response_ball_position) %>% 
-  summarize(means = mean(proportional_response))
+  summarize(means = mean(proportional_response), sd = sd(proportional_response))
   
 
 fig1 <- ggplot(
@@ -2567,7 +2551,75 @@ ggsave(filename = "../../figures/plots/preference_select_ball.pdf",
 
 ```
 
+##Combined Results: Arrange Method
+```{r}
+
+#Modify individual plots for grid format
+fig1_char <- fig1_char + 
+  ggtitle("Experiment 1") +
+  theme_stata() +
+  theme(
+    plot.title = element_text(size = 20, hjust = 0.5),
+    axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 10, b = 0, l = 0)),
+    axis.text.x = element_text(size = 15),
+    strip.text.x = element_text(size = 15),
+    axis.text.y = element_text(size=14),
+    legend.position = 'none',
+    text = element_text(family = "serif")) +
+  ylim(10, 90)
+
+fig1_nochar <- fig1_nochar + 
+  ggtitle("Experiment 2a")+
+  theme_stata() +
+  theme(
+    plot.title = element_text(size = 20, hjust = 0.5),
+    axis.text.x = element_text(size = 15),
+    strip.text.x = element_text(size = 15),
+    axis.text.y = element_text(size=14),
+    legend.position = 'none',
+    text = element_text(family = "serif")) +
+  ylab(element_blank()) +
+  ylim(10, 90)
+
+fig1_lamp <- fig1_lamp + 
+  ggtitle("Experiment 2b")+
+  theme_stata() +
+  theme(
+    plot.title = element_text(size = 20, hjust = 0.5),
+    axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 10, b = 0, l = 0)),
+    axis.text.x = element_text(size = 15),
+    strip.text.x = element_text(size = 15),
+    axis.text.y = element_text(size=14),
+    legend.position = 'none',
+    text = element_text(family = "serif")) +
+  ylim(10, 90)
+
+fig1_controlchar <- fig1_controlchar + 
+  ggtitle("Experiment 2c")+
+  theme_stata() +
+  theme(
+    plot.title = element_text(size = 20, hjust = 0.5),
+    axis.text.x = element_text(size = 15),
+    strip.text.x = element_text(size = 15),
+    axis.text.y = element_text(size=14),
+    legend.position = 'none',
+    text = element_text(family = "serif")) +
+  ylab(element_blank()) +
+  ylim(10, 90)
+
+#Paste plots together
+combined_fig <- arrangeGrob(
+  fig1_char,
+  fig1_nochar,
+  fig1_lamp,
+  fig1_controlchar
+)
+
+ggsave(filename = "../../figures/plots/combined_fig.pdf", combined_fig,
+       width = 10,
+       height = 8)
 ```
+
 
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
