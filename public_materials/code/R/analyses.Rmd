@@ -430,7 +430,17 @@ glm.5 <- glmer(
 
 aov.1 <- anova(glm.4, glm.5)
 
+#show results
 aov.1
+
+#show number of trials per participant
+n_trials.ex1 <- df.ex1.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  count(workerid) %>% 
+  summarise(avg_trials = mean(n))
+n_trials.ex1
 ```
 
 ####Follow-up
@@ -452,6 +462,16 @@ lm.6 <- lmer(
   data = df.ex1.lm )
 
 anova(lm.5, lm.6)
+
+#show number of trials per participant
+n_trials.ex1_followup <- df.ex1.trials %>% 
+  filter(
+   !ego_can_infer
+  ) %>% 
+  count(workerid) %>% 
+  summarise(avg_trials = mean(n))
+
+n_trials.ex1_followup
 ```
 
 
@@ -582,7 +602,6 @@ fig1_nochar <- ggplot(
     strip.text.x = element_text(size = 14),
     axis.title = element_text(size = 14, margin = unit(c(0,0.2,0,0), 'cm')),
     axis.text = element_text(size = 12),)
-
 ```
 
 ##Analyses
@@ -608,6 +627,15 @@ glm.3 <- glmer(
 aov.1 <- anova(glm.2, glm.3)
 
 aov.1
+
+#show number of trials per participant
+n_trials.ex2a <- df.ex2a.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  count(workerid) %>% 
+  summarise(avg_trials = mean(n))
+n_trials.ex2a
 ```
 
 ####Follow-up
@@ -629,6 +657,15 @@ lm.4 <- lmer(
   data = df.ex2a.lm )
 
 anova(lm.3, lm.4)
+
+#show number of trials per participant
+n_trials.ex2a_followup <- df.ex2a.trials %>% 
+  filter(
+    !ego_can_infer
+  ) %>% 
+  count(workerid) %>% 
+  summarise(avg_trials = mean(n))
+n_trials.ex2a_followup
 ```
 
 #EXPERIMENT 2b
@@ -773,6 +810,15 @@ glm.7 <- glmer(
 aov.2 <- anova(glm.6, glm.7)
 
 aov.2
+
+#show number of trials per participant
+n_trials.ex2b <- df.ex2b.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  count(workerid) %>% 
+  summarise(avg_trials = mean(n))
+n_trials.ex2b
 ```
 
 ####Follow-up
@@ -794,6 +840,15 @@ lm.8 <- lmer(
   data = df.ex2b.lm )
 
 anova(lm.7, lm.8)
+
+#show number of trials per participant
+n_trials.ex2b_followup <- df.ex2b.trials %>% 
+  filter(
+    !ego_can_infer
+  ) %>% 
+  count(workerid) %>% 
+  summarise(avg_trials = mean(n))
+n_trials.ex2b_followup
 ```
 
 #EXPERIMENT 2c
@@ -939,6 +994,15 @@ glm.11 <- glmer(
 aov.5 <- anova(glm.10, glm.11)
 
 aov.5
+
+#show number of trials per participant
+n_trials.ex2c <- df.ex2c.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  count(workerid) %>% 
+  summarise(avg_trials = mean(n))
+n_trials.ex2c
 ```
 
 ####Follow-up
@@ -960,6 +1024,16 @@ lm.10 <- lmer(
   data = df.ex2c.lm )
 
 anova(lm.9, lm.10)
+
+#show number of trials per participant
+n_trials.ex2c_followup <- df.ex2c.trials %>% 
+  filter(
+    !ego_can_infer
+  ) %>% 
+  count(workerid) %>% 
+  summarise(avg_trials = mean(n))
+
+n_trials.ex2c_followup
 ```
 
 # COMBINED FIGURES/ANALYSES
