@@ -69,21 +69,6 @@ const data_collection = true
     prolific_session_id: session_id
   })
 
-// SET CONDITION from DATAPIPE
-async function setConditionWithRetry(maxRetries = 3, delayBetweenRetries = 100) {
-    let retries = 0;
-    while (retries < maxRetries) {
-        try { 
-            const condition = await jsPsychPipe.getCondition(expID);
-            return condition;
-        } catch (error) {
-            console.error('Error retrieving condition (retry attempt', retries + 1, 'of', maxRetries, '):', error);
-            retries++;
-            await new Promise(resolve => setTimeout(resolve, delayBetweenRetries)); // Wait before retrying
-        }
-    }
-    throw new Error('Failed to retrieve condition after maximum retries');
-}
 
 
 //------------------------------------------------------------------------------------------------------------------------------------------------
