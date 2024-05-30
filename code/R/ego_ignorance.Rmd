@@ -27,6 +27,8 @@ library(tidyverse)
 ##Load Data
 ```{r}
 df.ex1.trials <- read_csv("../../data/experiment_1/ego_ignorance_thesis-trials.csv")
+
+n_distinct(df.ex1.trials$workerid)
 ```
 
 ##Wrangle Data
@@ -699,23 +701,7 @@ aov.1
 
 ####Pairwise follow-up
 ```{r}
-#get participant level summary
-df.ex1.lm <- df.ex1.trials %>% 
-  filter(
-    !ego_can_infer
-  ) %>% 
-  group_by(response_alter_occluded, workerid) %>% 
-  summarize(responses = n())
-
-lm.1 <- lmer(
-  formula = responses ~ response_alter_occluded + (1|workerid),  
-  data = df.ex1.lm )
-
-lm.2 <- lmer(
-  formula = responses ~ 1 + (1|workerid),  
-  data = df.ex1.lm )
-
-anova(lm.1, lm.2)
+emmeans(glm.0, pairwise ~ ego_can_infer)
 ```
 
 
@@ -1068,23 +1054,7 @@ aov.1
 
 ####Pairwise follow-up
 ```{r}
-#get participant level summary
-df.control.lm <- df.control.trials %>% 
-  filter(
-    !ego_can_infer
-  ) %>% 
-  group_by(response_alter_occluded, workerid) %>% 
-  summarize(responses = n())
-
-lm.3 <- lmer(
-  formula = responses ~ response_alter_occluded + (1|workerid),  
-  data = df.control.lm )
-
-lm.4 <- lmer(
-  formula = responses ~ 1 + (1|workerid),  
-  data = df.control.lm )
-
-anova(lm.3, lm.4)
+emmeans(glm.2, pairwise ~ ego_can_infer)
 ```
 
 #EXPERIMENT 2
@@ -1265,7 +1235,7 @@ ggsave(filename = "../../figures/plots/alter_knowledge_character_violin.pdf",
        width = 5,
        height = 4)
 
-fig1
+fig1_char
 ```
 
 ###Interest in Alter Knowledge in complete ego_ignorance
@@ -1586,23 +1556,7 @@ aov.1
 ```
 ####Pairwise follow-up
 ```{r}
-#get participant level summary
-df.ex2.lm <- df.ex2.trials %>% 
-  filter(
-    !ego_can_infer
-  ) %>% 
-  group_by(response_alter_occluded, workerid) %>% 
-  summarize(responses = n())
-
-lm.5 <- lmer(
-  formula = responses ~ response_alter_occluded + (1|workerid),  
-  data = df.ex2.lm )
-
-lm.6 <- lmer(
-  formula = responses ~ 1 + (1|workerid),  
-  data = df.ex2.lm )
-
-anova(lm.5, lm.6)
+emmeans(glm.4, pairwise ~ ego_can_infer)
 ```
 
 ###Interest in alter knowledge from rt (GLM)
@@ -1933,23 +1887,7 @@ aov.2
 
 ####Pairwise follow-up
 ```{r}
-#get participant level summary
-df.ex3.lm <- df.ex3.trials %>% 
-  filter(
-    !ego_can_infer
-  ) %>% 
-  group_by(response_alter_occluded, workerid) %>% 
-  summarize(responses = n())
-
-lm.7 <- lmer(
-  formula = responses ~ response_alter_occluded + (1|workerid),  
-  data = df.ex3.lm )
-
-lm.8 <- lmer(
-  formula = responses ~ 1 + (1|workerid),  
-  data = df.ex3.lm )
-
-anova(lm.7, lm.8)
+emmeans(glm.6, pairwise ~ ego_can_infer)
 ```
 
 #EXPERIMENT 4
@@ -2194,6 +2132,7 @@ aov.3 <- anova(glm.6, glm.7)
 
 tidy(aov.3)
 ```
+
 #EXPERIMENT 5
 
 ##Load Data
@@ -2407,25 +2346,225 @@ aov.5
 
 ####Pairwise follow-up
 ```{r}
-#get participant level summary
-df.ex5.lm <- df.ex5.trials %>% 
-  filter(
-    !ego_can_infer
-  ) %>% 
-  group_by(response_alter_occluded, workerid) %>% 
-  summarize(responses = n())
+emmeans(glm.10, pairwise ~ ego_can_infer)
+```
+# EXPERIMENT 1 REPLICATION
 
-lm.9 <- lmer(
-  formula = responses ~ response_alter_occluded + (1|workerid),  
-  data = df.ex5.lm )
+##load data
+```{r}
+#get ids of completed participants
+df.demos.ex1_rep <- read_csv("../../data/experiment_1_replication/prolific_demographics.csv") %>% 
+  filter(Status=='AWAITING REVIEW')
 
-lm.10 <- lmer(
-  formula = responses ~ 1 + (1|workerid),  
-  data = df.ex5.lm )
+#bulk import data
+file_list <- list.files(path = "../../data/experiment_1_replication/raw_data", pattern = "\\.csv$", full.names = TRUE)
 
-anova(lm.9, lm.10)
+# Initialize an empty list to store dataframes
+df_list <- list()
+
+# Loop through each CSV file
+for (file in file_list) {
+  df <- read_csv(file, col_types = cols(.default = col_character())) %>% 
+    mutate(workerid = substr(file,46,55)) #add particiant's random id from filename 
+  df_list[[length(df_list) + 1]] <- df
+}
+
+# Combine all dataframes into a single dataframe
+df.import.ex1_rep <- bind_rows(df_list)
+
+#create individual datasets
+df.ex1_rep.trials <- df.import.ex1_rep %>% 
+  filter(prolific_id %in% df.demos.ex1_rep$`Participant id`) %>% #REMOVE PARTICIPANTS WHO DIDN'T COMPLETE PROPERLY
+  filter(trial=='prediction_trial') %>% 
+  select(-prolific_id, -prolific_study_id, -prolific_session_id, -feedback, -age, -ethnicity, -gender, -race, -overall_accuracy, -bonus, -correct_response, -stimulus_dict, -view_history, -success, -timeout, -failed_images, -failed_audio, -failed_video)
+
+df.ex1_rep.participants <- df.import.ex1_rep %>% 
+  filter(trial=='exit_survey')
+
+write.csv(df.ex1_rep.trials, "../../data/experiment_1_replication/ex1_rep_trials.csv")
+write.csv(df.ex1_rep.participants, "../../data/experiment_1_replication/ex1_rep_participants.csv")
 ```
 
+## Wrangle Data
+```{r}
+#quick function to count occluders in a string
+n_occluders <- Vectorize(function(x) {
+  return(sum(as.numeric(strsplit(x, '')[[1]])))
+})
+
+#add some info
+df.ex1_rep.trials <- df.ex1_rep.trials %>% 
+  mutate(
+    accuracy = as.logical(accuracy),
+    character_choice = as.integer(character_choice),
+    ego_can_infer = as.logical(ego_can_infer),
+    ego_ball_visible = as.logical(ego_ball_visible),
+    response = as.integer(response),
+    response_alter_occluded = case_when(
+      substring(alter_occluders, response+1, response+1) == '1' ~ TRUE,
+      TRUE ~ FALSE
+    ),
+    response_ego_occluded = case_when(
+      substring(ego_occluders, response+1, response+1) == '1' ~ TRUE,
+      TRUE ~ FALSE
+    ),
+    num_ego_occluders = n_occluders(ego_occluders),
+    num_alter_occluders = n_occluders(alter_occluders),
+    response_ball_position = (response==ball_pos))
+```
+
+##Calculate Bonus info
+```{r, eval=FALSE}
+#select bonuses with prolific ids
+df.ex1_rep.rewards <- df.ex1_rep.participants %>% 
+  select(prolific_id, bonus) %>% 
+  mutate(bonus = round(as.numeric(bonus), 2))
+
+#write out bonus csv
+write.table(df.ex1_rep.rewards,
+            "../../data/experiment_1_replication/experiment_1_rep-bonuses.csv",
+            sep = ",", 
+            col.names = FALSE,
+            row.names = FALSE,
+            quote = FALSE)
+``` 
+
+##Get Demographics
+```{r}
+#get demos
+df.ex1_rep.demos <- read_csv("../../data/experiment_1_replication/ex1_rep_participants.csv") %>% 
+  filter(workerid %in% df.ex1_rep.trials$workerid)
+
+ex1_rep.demos.gender <- df.ex1_rep.demos %>% 
+  count(gender)
+ex1_rep.demos.gender
+ex1_rep.mean_age <- mean(df.ex1_rep.demos$age)
+ex1_rep.mean_age
+```
+
+##Analyses
+
+### Accuracy in 'easy' trials
+```{r}
+easy_trials.ex1_rep <- df.ex1_rep.trials %>% 
+  filter(ego_can_infer & alter_can_infer) %>% 
+  group_by(workerid) %>% 
+  summarise(accuracy = mean(accuracy_bool)) %>% 
+  ungroup() %>% 
+  summarize(mean = mean(accuracy), sd = sd(accuracy))
+easy_trials.ex1_rep
+```
+
+
+###Interest in alter knowledge from responses (GLM)
+```{r}
+
+ex1_rep_alter_ig_data <- df.ex1_rep.trials %>% 
+  filter(
+    !ego_ball_visible
+  )
+
+glm.12 <- glmer(
+  formula = response_alter_occluded ~ ego_can_infer + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = ex1_rep_alter_ig_data,
+  family = 'binomial')
+
+glm.13 <- glmer(
+  formula = response_alter_occluded ~ 1 + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = ex1_rep_alter_ig_data,
+  family = 'binomial')
+
+aov.6 <- anova(glm.12, glm.13)
+
+aov.6
+```
+###Pairwise Followup
+```{r}
+emmeans(glm.12, pairwise ~ ego_can_infer)
+```
+
+
+## Figures
+
+###Interest in Alter Knowledge (violin)
+```{r}
+alter_ig_ex1_rep_data <- df.ex1_rep.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  mutate(
+    ego_can_infer = case_when(ego_can_infer~'Knowledge', TRUE~'Ignorance'),
+    response_alter_occluded = case_when(response_alter_occluded~"Occluded", TRUE~'Visible')
+  ) %>% 
+  count(ego_can_infer, response_alter_occluded, workerid)
+
+#quickly get the number of total responses in each category
+ex1_rep_total_responses <- alter_ig_ex1_rep_data %>% 
+  group_by(workerid, ego_can_infer) %>% 
+  mutate(total_responses = sum(n))
+
+#convert responses to percentages
+alter_ig_ex1_rep_data <- alter_ig_ex1_rep_data %>% 
+  inner_join(ex1_rep_total_responses) %>% 
+  mutate(percentage = (n / total_responses)*100)
+
+#calculate means 
+ex1_rep_fig_means <- alter_ig_ex1_rep_data %>% 
+  group_by(ego_can_infer, response_alter_occluded) %>% 
+  dplyr::summarize(mean = mean(percentage))
+
+fig1_char <- ggplot(
+  data = alter_ig_ex1_rep_data,
+  mapping = aes(
+    x = response_alter_occluded,
+    y = percentage,
+    color = response_alter_occluded)
+  ) +
+  geom_point(
+    position = position_jitterdodge(dodge.width = 0.9, jitter.width = 0.2),
+    size = 0.9,
+    alpha = 1) +
+  geom_violin(
+    aes(alpha = 0),
+    position = position_dodge(width=0.9)) +
+  geom_boxplot(
+    aes(alpha = 0),
+    outlier.shape = NA,
+    width = 0.15,
+    position = position_dodge(width=0.9),
+    fatten = NULL) +
+  geom_line(
+    data = ex1_rep_fig_means,
+    mapping = aes(x = response_alter_occluded, 
+      y = mean, 
+      group=ego_can_infer),
+    color="grey30"
+    ) +
+  geom_point(
+    data = ex1_rep_fig_means, 
+    mapping = aes(x = response_alter_occluded, 
+      y = mean, 
+      group=response_alter_occluded),
+    position = position_dodge(width=0.9)
+  ) + 
+  facet_grid(~ego_can_infer) +
+  xlab(element_blank()) +
+  ylab("Participant Responses (percent)") +
+  ylim(0, 100) +
+  theme_minimal() +
+  scale_colour_ptol() +
+  theme(
+    legend.position = "none",
+    strip.text.x = element_text(size = 14),
+    axis.title = element_text(size = 14, margin = unit(c(0,0.2,0,0), 'cm')),
+    axis.text = element_text(size = 12),)
+
+ggsave(filename = "../../figures/plots/alter_knowledge_replication.pdf",
+       width = 5,
+       height = 4)
+
+fig1_char
+```
 # COMBINED FIGURES/ANALYSES
 
 ##'Correct' Choices?

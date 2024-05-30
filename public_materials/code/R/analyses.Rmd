@@ -163,48 +163,6 @@ fig0 <- ggplot(
 
 ## Analyses
 
-### Interest in alter knowledge
-```{r}
-
-#Responses
-#df.glm.0 <- df.pilot.trials 
-
-#is the participant more likely to select a position that is alter occluded when they know where the ball is? aka 
-#are they more likely to select an !alter_occluded position when they don't know where the ball is 
-#glm.0 = glm(
-#  response_alter_occluded ~ ego_can_infer + num_alter_occluders,
-#  data = df.mult.0)
-
-
-#using participant level probabilities of selecting an alter occluded position
-alter_ig_data <- df.pilot.trials %>% 
-  filter(
-    !ego_ball_visible
-  ) %>% 
-  group_by(ego_can_infer, response_alter_occluded, workerid) %>% 
-  summarize(
-    responses = n(),
-    total_alt_occluded = sum(num_alter_occluders)
-  )
-
-
-corrected_alter_ig_data <- alter_ig_data %>% 
-  group_by(ego_can_infer, workerid) %>% 
-  summarize(
-    total_condition_alt_occluded = sum(total_alt_occluded)) %>% 
-  inner_join(alter_ig_data, by = c('ego_can_infer', 'workerid')) %>% 
-  filter(response_alter_occluded) %>% 
-  mutate(
-    probability_response_alter_occluded = responses / total_condition_alt_occluded
-  )
-
-#Are participants more likely to select alter occluded positions when they know where the ball is? (and therefore more likely to select alter-visible positions when they don't know where the ball is)
-#performed on participant x condition 'probability score' (total number of occluded or non-occluded positions corrected for the baseline freuency of occluded or non-occluded positions)
-aov.1 <- aov(probability_response_alter_occluded ~ ego_can_infer + workerid, data = corrected_alter_ig_data)
-summary(aov.1)
-
-```
-
 ###Interest in alter knowledge (GLM)
 ```{r}
 
@@ -223,29 +181,14 @@ glm.1 <- glmer(
   data = df.pilot.glm.0,
   family = 'binomial')
 
-aov.1 <- anova(glm.0, glm.1)
-aov.1
+aov.0 <- anova(glm.0, glm.1)
+aov.0
 ```
 
 ####Pairwise follow-up
 ```{r}
 #get participant level summary
-df.pilot.lm <- df.pilot.trials %>% 
-  filter(
-    !ego_can_infer
-  ) %>% 
-  group_by(response_alter_occluded, workerid) %>% 
-  summarize(responses = n())
-
-lm.1 <- lmer(
-  formula = responses ~ response_alter_occluded + (1|workerid),  
-  data = df.pilot.lm )
-
-lm.2 <- lmer(
-  formula = responses ~ 1 + (1|workerid),  
-  data = df.pilot.lm )
-
-anova(lm.1, lm.2)
+emmeans(glm.0, pairwise ~ ego_can_infer)
 ```
 
 ####Post-hoc power analysis
@@ -286,11 +229,11 @@ pwr.anova.test(k=2,            # 2 groups are compared
 #shows n=55
 ```
 
-#EXPERIMENT 1
+#EXPERIMENT 1a
 
 ##Load Data
 ```{r}
-df.ex1.trials <- read_csv("../../data/experiment_1/ego_ignorance_thesis_experiment_1-trials.csv")
+df.ex1.trials <- read_csv("../../data/experiment_1a/ego_ignorance_thesis_experiment_1-trials.csv")
 ```
 
 ##Wrangle Data
@@ -321,7 +264,7 @@ df.ex1.trials <- df.ex1.trials %>%
 ##Get Demographics
 ```{r}
 #get demos
-df.ex1.demos <- read_csv("../../data/experiment_1/ego_ignorance_thesis_experiment_1-participants.csv") 
+df.ex1.demos <- read_csv("../../data/experiment_1a/ego_ignorance_thesis_experiment_1-participants.csv") 
 
 ex1.demos.gender <- df.ex1.demos %>% 
   count(gender)
@@ -418,17 +361,17 @@ ex1_alter_ig_data <- df.ex1.trials %>%
     !ego_ball_visible
   )
 
-glm.4 <- glmer(
+glm.2 <- glmer(
   formula = response_alter_occluded ~ ego_can_infer + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
   data = ex1_alter_ig_data,
   family = 'binomial')
 
-glm.5 <- glmer(
+glm.3 <- glmer(
   formula = response_alter_occluded ~ 1 + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
   data = ex1_alter_ig_data,
   family = 'binomial')
 
-aov.1 <- anova(glm.4, glm.5)
+aov.1 <- anova(glm.2, glm.3)
 
 #show results
 aov.1
@@ -445,35 +388,190 @@ n_trials.ex1
 
 ####Follow-up
 ```{r}
-#get participant level summary
-df.ex1.lm <- df.ex1.trials %>% 
+emmeans(glm.2, pairwise ~ ego_can_infer)
+```
+
+# EXPERIMENT 1b (replication)
+
+##load data
+```{r}
+#get ids of completed participants
+df.ex1_rep.trials <- read_csv("../../data/experiment_1b/ex1_rep_trials.csv")
+df.ex1_rep.participants <- read_csv("../../data/experiment_1b/ex1_rep_participants.csv") %>% 
+  filter(!is.na(gender))
+
+```
+
+## Wrangle Data
+```{r}
+#quick function to count occluders in a string
+n_occluders <- Vectorize(function(x) {
+  return(sum(as.numeric(strsplit(x, '')[[1]])))
+})
+
+#add some info
+df.ex1_rep.trials <- df.ex1_rep.trials %>% 
+  mutate(
+    accuracy = as.logical(accuracy),
+    character_choice = as.integer(character_choice),
+    ego_can_infer = as.logical(ego_can_infer),
+    ego_ball_visible = as.logical(ego_ball_visible),
+    response = as.integer(response),
+    response_alter_occluded = case_when(
+      substring(alter_occluders, response+1, response+1) == '1' ~ TRUE,
+      TRUE ~ FALSE
+    ),
+    response_ego_occluded = case_when(
+      substring(ego_occluders, response+1, response+1) == '1' ~ TRUE,
+      TRUE ~ FALSE
+    ),
+    num_ego_occluders = n_occluders(ego_occluders),
+    num_alter_occluders = n_occluders(alter_occluders),
+    response_ball_position = (response==ball_pos))
+```
+
+##Get Demographics
+```{r}
+#get demos
+df.ex1_rep.demos <- read_csv("../../data/experiment_1b/ex1_rep_participants.csv") %>% 
+  filter(workerid %in% df.ex1_rep.trials$workerid)
+
+ex1_rep.demos.gender <- df.ex1_rep.demos %>% 
+  count(gender)
+ex1_rep.demos.gender
+ex1_rep.mean_age <- mean(df.ex1_rep.demos$age)
+ex1_rep.mean_age
+```
+
+##Analyses
+
+### Accuracy in 'easy' trials
+```{r}
+easy_trials.ex1_rep <- df.ex1_rep.trials %>% 
+  filter(ego_can_infer & alter_can_infer) %>% 
+  group_by(workerid) %>% 
+  summarise(accuracy = mean(accuracy_bool)) %>% 
+  ungroup() %>% 
+  summarize(mean = mean(accuracy), sd = sd(accuracy))
+
+easy_trials.ex1_rep
+```
+
+###Interest in alter knowledge from responses (GLM)
+```{r}
+
+ex1_rep_alter_ig_data <- df.ex1_rep.trials %>% 
   filter(
-    !ego_can_infer
-  ) %>% 
-  group_by(response_alter_occluded, workerid) %>% 
-  summarize(responses = n())
+    !ego_ball_visible
+  )
 
-lm.5 <- lmer(
-  formula = responses ~ response_alter_occluded + (1|workerid),  
-  data = df.ex1.lm )
+glm.4 <- glmer(
+  formula = response_alter_occluded ~ ego_can_infer + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = ex1_rep_alter_ig_data,
+  family = 'binomial')
 
-lm.6 <- lmer(
-  formula = responses ~ 1 + (1|workerid),  
-  data = df.ex1.lm )
+glm.5 <- glmer(
+  formula = response_alter_occluded ~ 1 + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
+  data = ex1_rep_alter_ig_data,
+  family = 'binomial')
 
-anova(lm.5, lm.6)
+aov.2 <- anova(glm.4, glm.5)
+
+aov.2
 
 #show number of trials per participant
-n_trials.ex1_followup <- df.ex1.trials %>% 
+n_trials.ex1b <- df.ex1_rep.trials %>% 
   filter(
-   !ego_can_infer
+    !ego_ball_visible
   ) %>% 
   count(workerid) %>% 
   summarise(avg_trials = mean(n))
-
-n_trials.ex1_followup
+n_trials.ex1b
 ```
 
+###Follow-up
+```{r}
+emmeans(glm.4, pairwise ~ ego_can_infer)
+```
+
+
+## Figures
+
+###Interest in Alter Knowledge (violin)
+```{r}
+alter_ig_ex1_rep_data <- df.ex1_rep.trials %>% 
+  filter(
+    !ego_ball_visible
+  ) %>% 
+  mutate(
+    ego_can_infer = case_when(ego_can_infer~'Knowledge', TRUE~'Ignorance'),
+    response_alter_occluded = case_when(response_alter_occluded~"Occluded", TRUE~'Visible')
+  ) %>% 
+  count(ego_can_infer, response_alter_occluded, workerid)
+
+#quickly get the number of total responses in each category
+ex1_rep_total_responses <- alter_ig_ex1_rep_data %>% 
+  group_by(workerid, ego_can_infer) %>% 
+  mutate(total_responses = sum(n))
+
+#convert responses to percentages
+alter_ig_ex1_rep_data <- alter_ig_ex1_rep_data %>% 
+  inner_join(ex1_rep_total_responses) %>% 
+  mutate(percentage = (n / total_responses)*100)
+
+#calculate means 
+ex1_rep_fig_means <- alter_ig_ex1_rep_data %>% 
+  group_by(ego_can_infer, response_alter_occluded) %>% 
+  dplyr::summarize(mean = mean(percentage))
+
+fig1b_char <- ggplot(
+  data = alter_ig_ex1_rep_data,
+  mapping = aes(
+    x = response_alter_occluded,
+    y = percentage,
+    color = response_alter_occluded)
+  ) +
+  geom_point(
+    position = position_jitterdodge(dodge.width = 0.9, jitter.width = 0.2),
+    size = 0.9,
+    alpha = 1) +
+  geom_violin(
+    aes(alpha = 0),
+    position = position_dodge(width=0.9)) +
+  geom_boxplot(
+    aes(alpha = 0),
+    outlier.shape = NA,
+    width = 0.15,
+    position = position_dodge(width=0.9),
+    fatten = NULL) +
+  geom_line(
+    data = ex1_rep_fig_means,
+    mapping = aes(x = response_alter_occluded, 
+      y = mean, 
+      group=ego_can_infer),
+    color="grey30"
+    ) +
+  geom_point(
+    data = ex1_rep_fig_means, 
+    mapping = aes(x = response_alter_occluded, 
+      y = mean, 
+      group=response_alter_occluded),
+    position = position_dodge(width=0.9)
+  ) + 
+  facet_grid(~ego_can_infer) +
+  xlab(element_blank()) +
+  ylab("Participant Responses (percent)") +
+  ylim(0, 100) +
+  theme_minimal() +
+  scale_colour_ptol() +
+  theme(
+    legend.position = "none",
+    strip.text.x = element_text(size = 14),
+    axis.title = element_text(size = 14, margin = unit(c(0,0.2,0,0), 'cm')),
+    axis.text = element_text(size = 12),)
+
+fig1b_char
+```
 
 #EXPERIMENT 2a
 
@@ -614,19 +712,19 @@ ex2a_alter_ig_data <- df.ex2a.trials %>%
     !ego_ball_visible
   )
 
-glm.2 <- glmer(
+glm.6 <- glmer(
   formula = response_alter_occluded ~ ego_can_infer + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
   data = ex2a_alter_ig_data,
   family = 'binomial')
 
-glm.3 <- glmer(
+glm.7 <- glmer(
   formula = response_alter_occluded ~ 1 + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
   data = ex2a_alter_ig_data,
   family = 'binomial')
 
-aov.1 <- anova(glm.2, glm.3)
+aov.3 <- anova(glm.6, glm.7)
 
-aov.1
+aov.3
 
 #show number of trials per participant
 n_trials.ex2a <- df.ex2a.trials %>% 
@@ -640,32 +738,7 @@ n_trials.ex2a
 
 ####Follow-up
 ```{r}
-#get participant level summary
-df.ex2a.lm <- df.ex2a.trials %>% 
-  filter(
-    !ego_can_infer
-  ) %>% 
-  group_by(response_alter_occluded, workerid) %>% 
-  summarize(responses = n())
-
-lm.3 <- lmer(
-  formula = responses ~ response_alter_occluded + (1|workerid),  
-  data = df.ex2a.lm )
-
-lm.4 <- lmer(
-  formula = responses ~ 1 + (1|workerid),  
-  data = df.ex2a.lm )
-
-anova(lm.3, lm.4)
-
-#show number of trials per participant
-n_trials.ex2a_followup <- df.ex2a.trials %>% 
-  filter(
-    !ego_can_infer
-  ) %>% 
-  count(workerid) %>% 
-  summarise(avg_trials = mean(n))
-n_trials.ex2a_followup
+emmeans(glm.6, pairwise ~ ego_can_infer)
 ```
 
 #EXPERIMENT 2b
@@ -797,19 +870,19 @@ ex2b_alter_ig_data <- df.ex2b.trials %>%
     !ego_ball_visible
   )
 
-glm.6 <- glmer(
+glm.8 <- glmer(
   formula = response_alter_occluded ~ ego_can_infer + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
   data = ex2b_alter_ig_data,
   family = 'binomial')
 
-glm.7 <- glmer(
+glm.9 <- glmer(
   formula = response_alter_occluded ~ 1 + num_alter_occluders + (ego_can_infer + num_alter_occluders|workerid),  
   data = ex2b_alter_ig_data,
   family = 'binomial')
 
-aov.2 <- anova(glm.6, glm.7)
+aov.4 <- anova(glm.8, glm.9)
 
-aov.2
+aov.4
 
 #show number of trials per participant
 n_trials.ex2b <- df.ex2b.trials %>% 
@@ -823,32 +896,7 @@ n_trials.ex2b
 
 ####Follow-up
 ```{r}
-#get participant level summary
-df.ex2b.lm <- df.ex2b.trials %>% 
-  filter(
-    !ego_can_infer
-  ) %>% 
-  group_by(response_alter_occluded, workerid) %>% 
-  summarize(responses = n())
-
-lm.7 <- lmer(
-  formula = responses ~ response_alter_occluded + (1|workerid),  
-  data = df.ex2b.lm )
-
-lm.8 <- lmer(
-  formula = responses ~ 1 + (1|workerid),  
-  data = df.ex2b.lm )
-
-anova(lm.7, lm.8)
-
-#show number of trials per participant
-n_trials.ex2b_followup <- df.ex2b.trials %>% 
-  filter(
-    !ego_can_infer
-  ) %>% 
-  count(workerid) %>% 
-  summarise(avg_trials = mean(n))
-n_trials.ex2b_followup
+emmeans(glm.8, pairwise ~ ego_can_infer)
 ```
 
 #EXPERIMENT 2c
@@ -1007,33 +1055,7 @@ n_trials.ex2c
 
 ####Follow-up
 ```{r}
-#get participant level summary
-df.ex2c.lm <- df.ex2c.trials %>% 
-  filter(
-    !ego_can_infer
-  ) %>% 
-  group_by(response_alter_occluded, workerid) %>% 
-  summarize(responses = n())
-
-lm.9 <- lmer(
-  formula = responses ~ response_alter_occluded + (1|workerid),  
-  data = df.ex2c.lm )
-
-lm.10 <- lmer(
-  formula = responses ~ 1 + (1|workerid),  
-  data = df.ex2c.lm )
-
-anova(lm.9, lm.10)
-
-#show number of trials per participant
-n_trials.ex2c_followup <- df.ex2c.trials %>% 
-  filter(
-    !ego_can_infer
-  ) %>% 
-  count(workerid) %>% 
-  summarise(avg_trials = mean(n))
-
-n_trials.ex2c_followup
+emmeans(glm.10, pairwise ~ ego_can_infer)
 ```
 
 # COMBINED FIGURES/ANALYSES
@@ -1067,7 +1089,7 @@ combined_accuracy_data_overall
 
 #Modify individual plots for grid format
 fig1_char <- fig1_char + 
-  ggtitle("Experiment 1") +
+  ggtitle("Experiment 1a") +
   theme_stata() +
   theme(
     plot.title = element_text(size = 20, hjust = 0.5),
@@ -1079,17 +1101,31 @@ fig1_char <- fig1_char +
     text = element_text(family = "serif")) +
   ylim(10, 90)
 
-fig1_nochar <- fig1_nochar + 
-  ggtitle("Experiment 2a")+
+fig1b_char <- fig1b_char + 
+  ggtitle("Experiment 1b") +
   theme_stata() +
   theme(
     plot.title = element_text(size = 20, hjust = 0.5),
+    axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 10, b = 0, l = 0)),
     axis.text.x = element_text(size = 15),
     strip.text.x = element_text(size = 15),
     axis.text.y = element_text(size=14),
     legend.position = 'none',
     text = element_text(family = "serif")) +
   ylab(element_blank()) +
+  ylim(10, 90)
+
+fig1_nochar <- fig1_nochar + 
+  ggtitle("Experiment 2a")+
+  theme_stata() +
+  theme(
+    plot.title = element_text(size = 20, hjust = 0.5),
+    axis.title.y = element_text(size = 16, margin = margin(t = 0, r = 10, b = 0, l = 0)),
+    axis.text.x = element_text(size = 15),
+    strip.text.x = element_text(size = 15),
+    axis.text.y = element_text(size=14),
+    legend.position = 'none',
+    text = element_text(family = "serif")) +
   ylim(10, 90)
 
 fig1_lamp <- fig1_lamp + 
@@ -1103,6 +1139,7 @@ fig1_lamp <- fig1_lamp +
     axis.text.y = element_text(size=14),
     legend.position = 'none',
     text = element_text(family = "serif")) +
+  ylab(element_blank()) +
   ylim(10, 90)
 
 fig1_ex2achar <- fig1_ex2achar + 
@@ -1119,16 +1156,29 @@ fig1_ex2achar <- fig1_ex2achar +
   ylim(10, 90)
 
 #Paste plots together
-combined_fig <- arrangeGrob(
+layout_ex2 <- rbind(c(1,2,3))
+layout_ex1 <- rbind(c(1,2))
+
+combined_fig_ex1 <- arrangeGrob(
   fig1_char,
-  fig1_nochar,
-  fig1_lamp,
-  fig1_ex2achar
+  fig1b_char,
+  layout_matrix = layout_ex1
 )
 
-ggsave(filename = "../../figures/combined_fig.pdf", combined_fig,
+combined_fig_ex2 <- arrangeGrob(
+  fig1_nochar,
+  fig1_lamp,
+  fig1_ex2achar,
+  layout_matrix = layout_ex2
+)
+
+ggsave(filename = "../../figures/combined_fig_ex1.pdf", combined_fig_ex1,
        width = 10,
-       height = 8)
+       height = 5)
+
+ggsave(filename = "../../figures/combined_fig_ex2.pdf", combined_fig_ex2,
+       width = 13,
+       height = 4.2)
 ```
 
 
